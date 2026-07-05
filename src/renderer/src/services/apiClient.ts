@@ -1,6 +1,6 @@
 import { API_BASE_URL, API_KEY } from '@/config/server';
 import { useAccountStore } from '@/stores/accountStore';
-import type { AuthSession, Collection, SyncResponse, Team, TeamMember } from '@/types';
+import type { AuthSession, Collection, SyncResponse, Team, TeamMember, TeamVariable } from '@/types';
 
 export class ApiError extends Error {
   status: number;
@@ -13,11 +13,15 @@ export class ApiError extends Error {
   }
 }
 
-/** Thrown specifically for a 409 collection conflict, carrying the server's current copy. */
+/**
+ * Thrown for a 409 conflict (collection or team variable last-write-wins
+ * rejection), carrying the server's current copy. `current`'s shape depends
+ * on which endpoint threw it — callers cast to the type they expect.
+ */
 export class ConflictError extends ApiError {
-  current: Collection;
+  current: unknown;
 
-  constructor(body: { message?: string; current: Collection }) {
+  constructor(body: { message?: string; current: unknown }) {
     super(409, body.message ?? 'Conflict', body);
     this.current = body.current;
   }
@@ -54,7 +58,7 @@ async function request<T>(
   const data: unknown = text ? JSON.parse(text) : null;
 
   if (!response.ok) {
-    if (response.status === 409) throw new ConflictError(data as { message?: string; current: Collection });
+    if (response.status === 409) throw new ConflictError(data as { message?: string; current: unknown });
 
     let message = `Request failed (${response.status})`;
     if (data && typeof data === 'object') {
@@ -136,4 +140,24 @@ export const apiClient = {
 
   addTeamMember: (teamId: string, email: string, role: string) =>
     request<TeamMember>('POST', `/teams/${teamId}/members`, { email, role }),
+
+  fetchTeamVariables: (teamId: string) =>
+    request<{ variables: TeamVariable[] }>('GET', `/teams/${teamId}/variables`),
+
+  createTeamVariable: (teamId: string, variable: TeamVariable) =>
+    request<TeamVariable>('POST', `/teams/${teamId}/variables`, {
+      id: variable.id,
+      key: variable.key,
+      value: variable.value,
+    }),
+
+  updateTeamVariable: (teamId: string, variable: TeamVariable) =>
+    request<TeamVariable>('PUT', `/teams/${teamId}/variables/${variable.id}`, {
+      key: variable.key,
+      value: variable.value,
+      updatedAt: variable.updatedAt,
+    }),
+
+  deleteTeamVariable: (teamId: string, variableId: string) =>
+    request<{ message: string }>('DELETE', `/teams/${teamId}/variables/${variableId}`),
 };
