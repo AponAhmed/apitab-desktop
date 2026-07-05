@@ -1,0 +1,52 @@
+@import 'tailwindcss';
+
+/* Class-based dark mode: utilities prefixed with `dark:` apply when an
+   ancestor (we use <html>) carries the `.dark` class. Ported verbatim from
+   the browser extension so dropped-in UI code needs no restyling. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Amber/gold accent, matching the extension's brand palette. */
+  --color-brand-50: #fffbeb;
+  --color-brand-100: #fef3c7;
+  --color-brand-200: #fde68a;
+  --color-brand-300: #fcd34d;
+  --color-brand-400: #fbbf24;
+  --color-brand-500: #f59e0b;
+  --color-brand-600: #d97706;
+  --color-brand-700: #b45309;
+  --color-brand-800: #92400e;
+  --color-brand-900: #78350f;
+  --color-brand-950: #451a03;
+
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace;
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+}
+
+@layer utilities {
+  /* Hides the native scrollbar while keeping the element scrollable (wheel,
+     drag, arrow-button driven). Used by strips like RecentRequestsBar that
+     want a "modern" chip-scroller feel instead of a visible track. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

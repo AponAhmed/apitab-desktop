@@ -1,0 +1,36 @@
+appId: com.apitab.desktop
+productName: ApiTab
+directories:
+  buildResources: build
+  output: dist
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json,yarn.lock}'
+  - '!{README.md,CHANGELOG.md}'
+asarUnpack:
+  - resources/**
+win:
+  executableName: apitab-desktop
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  artifactName: ${name}-${version}-setup.${ext}
+  shortcutName: ${productName}
+  uninstallDisplayName: ${productName}
+  createDesktopShortcut: always
+mac:
+  entitlementsInherit: build/entitlements.mac.plist
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  notarize: false
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Development
+npmRebuild: false
