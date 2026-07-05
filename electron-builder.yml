@@ -3,6 +3,9 @@ productName: ApiTab
 directories:
   buildResources: build
   output: dist
+# Consistent filenames across platforms (mac/linux targets otherwise
+# default to inconsistent templates — some use productName, some use name).
+artifactName: ${name}-${version}.${ext}
 files:
   - '!**/.vscode/*'
   - '!src/*'
@@ -31,6 +34,8 @@ mac:
 linux:
   target:
     - target: AppImage
+      arch: [x64]
+    - target: tar.gz
       arch: [x64]
   category: Development
 npmRebuild: false
