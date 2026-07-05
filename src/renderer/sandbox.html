@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Permits `new Function(...)` for user pre-request/post-response
+         scripts — deliberately more permissive than the main window's CSP,
+         scoped to this document only. Loaded in a plain iframe (see
+         scriptRunner.ts for why it isn't `sandbox`-attributed) that never
+         receives a preload script, so it has no window.api regardless. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="script-src 'self' 'unsafe-eval'; object-src 'self';"
+    />
+    <title>ApiTab Sandbox</title>
+  </head>
+  <body>
+    <script type="module" src="/src/sandbox-main.ts"></script>
+  </body>
+</html>
