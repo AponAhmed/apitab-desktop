@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: windows-latest
@@ -27,7 +28,12 @@ jobs:
 
       - run: npm ci
 
+      # Without this, electron-builder searches the runner's keychain for a
+      # code-signing certificate on macOS and fails outright when it finds
+      # none, instead of falling back to an unsigned build.
       - run: npm run ${{ matrix.script }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       # Unsigned builds: Windows shows an "unknown publisher" SmartScreen
       # warning and macOS needs a right-click-Open to bypass Gatekeeper,
