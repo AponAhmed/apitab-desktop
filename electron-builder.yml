@@ -15,11 +15,6 @@ files:
   - '!{README.md,CHANGELOG.md}'
 asarUnpack:
   - resources/**
-# Disables electron-builder's own implicit publish-on-tag behavior, which
-# needs its own GH_TOKEN and would otherwise try to create 3 separate
-# releases (one per matrix job) competing with the workflow's single
-# unified release job (softprops/action-gh-release).
-publish: never
 win:
   executableName: apitab-desktop
   target:
