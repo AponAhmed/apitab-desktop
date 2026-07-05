@@ -81,8 +81,8 @@ export function ShareToTeamDialog() {
             ))}
           </Select>
           <p className="text-xs text-slate-400">
-            Team members will be able to see and edit this collection. Environments are never
-            shared.
+            Owners/admins can edit it for everyone; plain members see it read-through — their
+            local changes never leave their device. Environments are never shared.
           </p>
         </div>
       )}

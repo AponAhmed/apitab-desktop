@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { uuid } from '@/utils/id';
 import { browserLocalStorage } from './persist';
+import { useTeamStore } from './teamStore';
+import { useTeamVariablesStore } from './teamVariablesStore';
 import type { Environment, EnvVariable } from '@/types';
 import type { VariableMap } from '@/utils/variables';
 
@@ -152,11 +154,22 @@ export const useEnvironmentStore = create<EnvironmentState>()(
 
       getActiveVariables: () => {
         const { environments, activeEnvironmentId } = get();
-        const env = environments.find((e) => e.id === activeEnvironmentId);
-        if (!env) return {};
         const map: VariableMap = {};
-        for (const v of env.variables.map(sanitizeVariable)) {
-          if (v.enabled && v.key.trim() !== '') map[v.key.trim()] = v.value;
+
+        // Team shared-variable pool is a lower-priority base layer — the
+        // active environment's own values win on a key collision.
+        const activeTeamId = useTeamStore.getState().activeTeamId;
+        if (activeTeamId) {
+          for (const v of useTeamVariablesStore.getState().variablesByTeam[activeTeamId] ?? []) {
+            map[v.key] = v.value;
+          }
+        }
+
+        const env = environments.find((e) => e.id === activeEnvironmentId);
+        if (env) {
+          for (const v of env.variables.map(sanitizeVariable)) {
+            if (v.enabled && v.key.trim() !== '') map[v.key.trim()] = v.value;
+          }
         }
         return map;
       },

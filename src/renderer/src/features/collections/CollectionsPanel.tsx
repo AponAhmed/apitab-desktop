@@ -10,11 +10,13 @@ import {
   Search,
   Trash2,
   Upload,
+  User,
   Users,
 } from 'lucide-react';
 import { useCollectionStore } from '@/stores/collectionStore';
 import { useRequestStore } from '@/stores/requestStore';
 import { useEnvironmentStore } from '@/stores/environmentStore';
+import { useTeamStore } from '@/stores/teamStore';
 import { useDialogStore } from '@/stores/dialogStore';
 import { toast } from '@/stores/toastStore';
 import { IconButton } from '@/components/ui/IconButton';
@@ -27,8 +29,9 @@ import { ShareToTeamDialog } from './ShareToTeamDialog';
 import { cn } from '@/utils/cn';
 import { countRequests, isCollection } from '@/utils/collectionTree';
 import { exportContainer, parseCollectionExport, sanitizeFilename } from '@/utils/collectionIO';
+import { parsePostmanFile } from '@/utils/postmanImport';
 import { downloadJson, readFileAsText } from '@/services/backup';
-import type { ApiRequest, Collection, Container } from '@/types';
+import type { ApiRequest, Collection, Container, TeamRole } from '@/types';
 
 interface CollectionActions {
   activeRequestId: string | null;
@@ -92,11 +95,14 @@ function ContainerNode({
   depth,
   collapsed,
   toggle,
+  role,
 }: {
   container: Container;
   depth: number;
   collapsed: Record<string, boolean>;
   toggle: (id: string) => void;
+  /** This device's role on the owning team, when `container` is a shared root collection. */
+  role?: TeamRole;
 }) {
   const actions = useActions();
   const root = isCollection(container);
@@ -147,7 +153,14 @@ function ContainerNode({
             {container.name}
           </span>
           {teamId && (
-            <span title="Shared with team" className="shrink-0">
+            <span
+              title={
+                role === 'member'
+                  ? 'Shared with team — your edits stay local to this device'
+                  : 'Shared with team — you can edit for everyone'
+              }
+              className="shrink-0"
+            >
               <Users className="h-3 w-3 text-brand-500" />
             </span>
           )}
@@ -177,6 +190,42 @@ function ContainerNode({
   );
 }
 
+interface WorkspaceGroup {
+  key: string;
+  label: string;
+  isTeam: boolean;
+  role?: TeamRole;
+  collections: Collection[];
+}
+
+/** Groups collections into "My Workspace" (personal) + one section per team, so shared and own collections read as visually distinct spaces. */
+function groupByWorkspace(collections: Collection[], teams: { id: string; name: string; role: TeamRole }[]): WorkspaceGroup[] {
+  const groups: WorkspaceGroup[] = [];
+
+  const personal = collections.filter((c) => !c.teamId);
+  if (personal.length > 0) {
+    groups.push({ key: 'personal', label: 'My Workspace', isTeam: false, collections: personal });
+  }
+
+  for (const team of teams) {
+    const teamCollections = collections.filter((c) => c.teamId === team.id);
+    if (teamCollections.length > 0) {
+      groups.push({ key: team.id, label: team.name, isTeam: true, role: team.role, collections: teamCollections });
+    }
+  }
+
+  // A collection tagged with a team this device no longer recognizes (left
+  // the team, or hasn't synced its membership yet) — still show it rather
+  // than silently dropping it from view.
+  const knownTeamIds = new Set(teams.map((t) => t.id));
+  const orphaned = collections.filter((c) => c.teamId && !knownTeamIds.has(c.teamId));
+  if (orphaned.length > 0) {
+    groups.push({ key: 'orphaned', label: 'Shared (team unavailable)', isTeam: true, collections: orphaned });
+  }
+
+  return groups;
+}
+
 function filterContainer<T extends Container>(container: T, q: string): T | null {
   if (container.name.toLowerCase().includes(q)) return container;
   const folders = container.folders
@@ -204,6 +253,7 @@ export function CollectionsPanel() {
   const loadRequest = useRequestStore((s) => s.loadRequest);
   const activeRequestId = useRequestStore((s) => s.savedRef?.requestId ?? null);
   const openShareToTeam = useDialogStore((s) => s.openShareToTeam);
+  const teams = useTeamStore((s) => s.teams);
 
   const environments = useEnvironmentStore((s) => s.environments);
   const activeEnvId = useEnvironmentStore((s) => s.activeEnvironmentId);
@@ -236,6 +286,8 @@ export function CollectionsPanel() {
     [collections, q],
   );
 
+  const groups = useMemo(() => groupByWorkspace(visible, teams), [visible, teams]);
+
   const actions: CollectionActions = {
     activeRequestId,
     openRequest: (containerId, req) => loadRequest(req, { containerId, requestId: req.id }),
@@ -264,17 +316,12 @@ export function CollectionsPanel() {
     shareToTeam: (collectionId) => openShareToTeam(collectionId),
   };
 
-  const onFile = async (file: File) => {
-    const parsed = parseCollectionExport(await readFileAsText(file));
-    if (!parsed.ok || !parsed.data) {
-      toast.error(parsed.error ?? 'Invalid file');
-      return;
-    }
+  const importCollectionExport = (data: NonNullable<ReturnType<typeof parseCollectionExport>['data']>) => {
     const target = importTarget.current;
-    if (target) importIntoContainer(target, parsed.data);
-    else importAsCollection(parsed.data);
+    if (target) importIntoContainer(target, data);
+    else importAsCollection(data);
 
-    const sharedVars = parsed.data.environmentVariables;
+    const sharedVars = data.environmentVariables;
     if (sharedVars?.length) {
       let envId = activeEnvId;
       let envName = environments.find((e) => e.id === envId)?.name;
@@ -291,6 +338,32 @@ export function CollectionsPanel() {
     } else {
       toast.success('Imported');
     }
+  };
+
+  const onFile = async (file: File) => {
+    const raw = await readFileAsText(file);
+
+    const native = parseCollectionExport(raw);
+    if (native.ok && native.data) {
+      importCollectionExport(native.data);
+      return;
+    }
+
+    // Not an ApiTab export — try it as a Postman collection or environment.
+    const postman = parsePostmanFile(raw);
+    if (postman.ok && postman.data) {
+      importCollectionExport(postman.data);
+      return;
+    }
+    if (postman.ok && postman.environment) {
+      const created = createEnvironment(postman.environment.name);
+      setActiveEnvironment(created.id);
+      for (const v of postman.environment.variables) upsertVariable(created.id, v.key, v.value);
+      toast.success(`Imported "${created.name}" with ${postman.environment.variables.length} variables`);
+      return;
+    }
+
+    toast.error(native.error ?? 'Invalid file — not an ApiTab or Postman export');
   };
 
   return (
@@ -329,14 +402,51 @@ export function CollectionsPanel() {
           />
         ) : (
           <ActionsContext.Provider value={actions}>
-            {visible.map((c) => (
-              <ContainerNode
-                key={c.id}
-                container={c}
-                depth={0}
-                collapsed={q ? {} : collapsed}
-                toggle={toggle}
-              />
+            {groups.map((group) => (
+              <div key={group.key} className="mb-3">
+                <div
+                  className={cn(
+                    'mb-1 flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide',
+                    group.isTeam ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400 dark:text-slate-500',
+                  )}
+                >
+                  {group.isTeam ? (
+                    <Users className="h-3 w-3 shrink-0" />
+                  ) : (
+                    <User className="h-3 w-3 shrink-0" />
+                  )}
+                  <span className="truncate">{group.label}</span>
+                  {group.role && (
+                    <span
+                      className={cn(
+                        'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-medium normal-case',
+                        group.role === 'member'
+                          ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                          : 'bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300',
+                      )}
+                    >
+                      {group.role}
+                    </span>
+                  )}
+                </div>
+                <div
+                  className={cn(
+                    group.isTeam &&
+                      'rounded-md border-l-2 border-brand-200 bg-brand-50/40 dark:border-brand-900 dark:bg-brand-950/10',
+                  )}
+                >
+                  {group.collections.map((c) => (
+                    <ContainerNode
+                      key={c.id}
+                      container={c}
+                      depth={0}
+                      collapsed={q ? {} : collapsed}
+                      toggle={toggle}
+                      role={group.role}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </ActionsContext.Provider>
         )}

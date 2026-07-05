@@ -2,8 +2,10 @@ import { apiClient, ConflictError } from './apiClient';
 import { useAccountStore } from '@/stores/accountStore';
 import { useTeamStore } from '@/stores/teamStore';
 import { useCollectionStore } from '@/stores/collectionStore';
+import { useEnvironmentStore } from '@/stores/environmentStore';
+import { useTeamVariablesStore } from '@/stores/teamVariablesStore';
 import { toast } from '@/stores/toastStore';
-import type { Collection } from '@/types';
+import type { Collection, Environment, TeamVariable } from '@/types';
 
 /*
  * Owns all awareness of "sync this to the server." collectionStore itself
@@ -25,6 +27,11 @@ let applyingRemote = false;
 /** Last known pushed/pulled `updatedAt` per collection id, to diff future local edits. */
 const pushedVersions = new Map<string, number>();
 
+/** This device's role on `teamId`, or undefined if the team isn't known locally. */
+function roleForTeam(teamId: string): string | undefined {
+  return useTeamStore.getState().teams.find((t) => t.id === teamId)?.role;
+}
+
 async function pushTeamCollection(teamId: string, collection: Collection) {
   try {
     const updated = await apiClient.updateRemoteCollection(teamId, collection);
@@ -38,10 +45,11 @@ async function pushTeamCollection(teamId: string, collection: Collection) {
   } catch (err) {
     if (err instanceof ConflictError) {
       // Confirmed rule: server wins, no merge UI. Adopt its copy.
-      pushedVersions.set(collection.id, err.current.updatedAt);
+      const current = err.current as Collection;
+      pushedVersions.set(collection.id, current.updatedAt);
       applyingRemote = true;
-      useCollectionStore.getState().mergeSync(teamId, [err.current], []);
-      toast.info(`"${err.current.name}" was updated elsewhere — synced the latest version.`);
+      useCollectionStore.getState().mergeSync(teamId, [current], []);
+      toast.info(`"${current.name}" was updated elsewhere — synced the latest version.`);
     }
     // Network/other errors: leave local state; the next mutation or poll retries.
   } finally {
@@ -66,6 +74,10 @@ function onCollectionsChanged(
     }
     if (c.updatedAt > known) {
       pushedVersions.set(c.id, c.updatedAt); // optimistic, avoids duplicate concurrent pushes
+      // Plain members get a local-only, read-through view of shared
+      // collections — the server rejects their writes anyway (403), so
+      // don't even attempt the round trip; their edit just stays on-device.
+      if (roleForTeam(c.teamId) === 'member') continue;
       void pushTeamCollection(c.teamId, c);
     }
   }
@@ -73,7 +85,9 @@ function onCollectionsChanged(
   const currentIds = new Set(state.collections.map((c) => c.id));
   for (const prev of prevState.collections) {
     if (prev.teamId && !currentIds.has(prev.id)) {
+      const role = roleForTeam(prev.teamId);
       pushedVersions.delete(prev.id);
+      if (role === 'member') continue; // local-only delete, never propagated
       void apiClient.deleteRemoteCollection(prev.teamId, prev.id).catch(() => {
         // Best-effort: if this fails the item may reappear on next pull, which is safe.
       });
@@ -81,11 +95,123 @@ function onCollectionsChanged(
   }
 }
 
+/**
+ * Last known pushed/pulled `{teamId, updatedAt}` per *environment variable*
+ * id that's flagged `shared`. Keyed by the variable's own id so a push and a
+ * later pull agree on identity even though environments themselves never
+ * sync — only the flagged values, via the flat per-team pool.
+ */
+const pushedVariableVersions = new Map<string, { teamId: string; updatedAt: number }>();
+
+/** Every `shared` variable across all local environments, by id. Empty keys are dropped. */
+function desiredSharedVariables(environments: Environment[]): Map<string, { key: string; value: string }> {
+  const map = new Map<string, { key: string; value: string }>();
+  for (const env of environments) {
+    for (const v of env.variables) {
+      if (v.shared && v.key.trim() !== '') map.set(v.id, { key: v.key.trim(), value: v.value });
+    }
+  }
+  return map;
+}
+
+async function pushSharedVariableUpsert(
+  teamId: string,
+  id: string,
+  key: string,
+  value: string,
+  isNew: boolean,
+): Promise<void> {
+  const now = Date.now();
+  const draft: TeamVariable = { id, key, value, createdAt: now, updatedAt: now };
+  try {
+    const saved = isNew
+      ? await apiClient.createTeamVariable(teamId, draft)
+      : await apiClient.updateTeamVariable(teamId, draft);
+    pushedVariableVersions.set(id, { teamId, updatedAt: saved.updatedAt });
+    useTeamVariablesStore.getState().upsertLocal(teamId, saved);
+  } catch (err) {
+    if (err instanceof ConflictError) {
+      // Same rule as collections: server wins, no merge UI.
+      const current = err.current as TeamVariable;
+      pushedVariableVersions.set(id, { teamId, updatedAt: current.updatedAt });
+      useTeamVariablesStore.getState().upsertLocal(teamId, current);
+      toast.info(`Shared variable "${current.key}" was updated elsewhere — synced the latest version.`);
+    }
+    // Network/other errors: leave as-is; the next environment edit or poll retries.
+  }
+}
+
+async function pushSharedVariableDelete(teamId: string, id: string): Promise<void> {
+  pushedVariableVersions.delete(id);
+  try {
+    await apiClient.deleteTeamVariable(teamId, id);
+  } catch {
+    // Best-effort: if this fails the item may reappear on next pull, which is safe.
+  } finally {
+    useTeamVariablesStore.getState().removeLocal(teamId, id);
+  }
+}
+
+function onEnvironmentsChanged(
+  state: ReturnType<typeof useEnvironmentStore.getState>,
+  _prevState: ReturnType<typeof useEnvironmentStore.getState>,
+) {
+  if (applyingRemote) return;
+  const teamId = useTeamStore.getState().activeTeamId;
+  if (!teamId) return;
+
+  const desired = desiredSharedVariables(state.environments);
+
+  for (const [id, { key, value }] of desired) {
+    const known = pushedVariableVersions.get(id);
+    if (!known) {
+      pushedVariableVersions.set(id, { teamId, updatedAt: Date.now() }); // optimistic, avoids duplicate concurrent pushes
+      void pushSharedVariableUpsert(teamId, id, key, value, true);
+      continue;
+    }
+    if (known.teamId !== teamId) {
+      // Active team changed while still shared — move it: drop from the old
+      // team's pool, create fresh in the new one.
+      void pushSharedVariableDelete(known.teamId, id);
+      pushedVariableVersions.set(id, { teamId, updatedAt: Date.now() });
+      void pushSharedVariableUpsert(teamId, id, key, value, true);
+      continue;
+    }
+    const local = useTeamVariablesStore.getState().variablesByTeam[teamId]?.find((v) => v.id === id);
+    if (!local || local.key !== key || local.value !== value) {
+      pushedVariableVersions.set(id, { teamId, updatedAt: Date.now() });
+      void pushSharedVariableUpsert(teamId, id, key, value, false);
+    }
+  }
+
+  for (const [id, known] of pushedVariableVersions) {
+    if (!desired.has(id)) void pushSharedVariableDelete(known.teamId, id);
+  }
+}
+
+/**
+ * Removes a variable from a team's shared pool. If it originated from one of
+ * this device's own environments (flagged `shared`), unsharing it locally is
+ * enough — `onEnvironmentsChanged` picks up the flip and pushes the delete.
+ * Otherwise (e.g. a variable shared by a teammate, not present in any local
+ * environment) it's removed from the pool directly.
+ */
+export function unshareTeamVariable(teamId: string, variableId: string): void {
+  for (const env of useEnvironmentStore.getState().environments) {
+    const match = env.variables.find((v) => v.id === variableId);
+    if (match?.shared) {
+      useEnvironmentStore.getState().updateVariable(env.id, variableId, { shared: false });
+      return;
+    }
+  }
+  void pushSharedVariableDelete(teamId, variableId);
+}
+
 let initialized = false;
 const POLL_INTERVAL_MS = 60_000;
 
 /**
- * Wires the push-on-mutation watcher and starts the periodic pull poll.
+ * Wires the push-on-mutation watchers and starts the periodic pull poll.
  * Safe to call repeatedly. Replaces the extension's `browser.alarms`-driven
  * poll (which existed to survive service-worker suspension) with a plain
  * interval, since this app's process stays alive for as long as it runs.
@@ -98,7 +224,15 @@ export function initSyncService(): void {
     if (c.teamId) pushedVersions.set(c.id, c.updatedAt);
   }
 
+  const activeTeamId = useTeamStore.getState().activeTeamId;
+  if (activeTeamId) {
+    for (const v of useTeamVariablesStore.getState().variablesByTeam[activeTeamId] ?? []) {
+      pushedVariableVersions.set(v.id, { teamId: activeTeamId, updatedAt: v.updatedAt });
+    }
+  }
+
   useCollectionStore.subscribe(onCollectionsChanged);
+  useEnvironmentStore.subscribe(onEnvironmentsChanged);
 
   setInterval(() => void runAllTeamsSync(), POLL_INTERVAL_MS);
 }
@@ -131,12 +265,16 @@ export async function runSyncTick(teamId: string): Promise<void> {
     applyingRemote = true;
     try {
       useCollectionStore.getState().mergeSync(teamId, res.collections, res.deletedCollectionIds);
+      useTeamVariablesStore.getState().mergeSync(teamId, res.variables, res.deletedVariableIds);
     } finally {
       applyingRemote = false;
     }
 
     for (const c of res.collections) pushedVersions.set(c.id, c.updatedAt);
     for (const id of res.deletedCollectionIds) pushedVersions.delete(id);
+
+    for (const v of res.variables) pushedVariableVersions.set(v.id, { teamId, updatedAt: v.updatedAt });
+    for (const id of res.deletedVariableIds) pushedVariableVersions.delete(id);
 
     useTeamStore.getState().recordSync(teamId, res.serverTime);
     useTeamStore.getState().setSyncError(null);
@@ -157,6 +295,19 @@ export async function runAllTeamsSync(): Promise<void> {
   await useTeamStore.persist.rehydrate();
 
   if (!useAccountStore.getState().session) return;
+
+  // Refresh the team membership list itself before syncing each team's
+  // collections/variables. Without this, being newly added to a team (or a
+  // team gaining collections you'd never synced before) stays invisible
+  // until the next login — polling only ever synced teams already known
+  // locally, never discovered new ones.
+  try {
+    const { teams } = await apiClient.fetchTeams();
+    useTeamStore.getState().setTeams(teams);
+  } catch {
+    // Offline or a transient failure — fall back to the already-known list.
+  }
+
   for (const team of useTeamStore.getState().teams) {
     await runSyncTick(team.id);
   }

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { LogIn, RefreshCw, UserPlus, Users, LogOut, Settings as SettingsIcon, UsersRound, Monitor, Sun, Moon } from 'lucide-react';
 import { useAccountStore } from '@/stores/accountStore';
 import { useTeamStore } from '@/stores/teamStore';
+import { useTeamVariablesStore } from '@/stores/teamVariablesStore';
 import { useDialogStore } from '@/stores/dialogStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { apiClient } from '@/services/apiClient';
@@ -125,6 +126,7 @@ export function AccountAvatar() {
     } catch {}
     clearSession();
     resetTeams();
+    useTeamVariablesStore.getState().reset();
     toast.info('Logged out');
   };
 
