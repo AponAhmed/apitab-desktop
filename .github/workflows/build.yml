@@ -1,0 +1,43 @@
+name: Build desktop app
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+          - os: macos-latest
+            script: dist:mac
+          - os: ubuntu-latest
+            script: dist:linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      - run: npm run ${{ matrix.script }}
+
+      # Unsigned builds: Windows shows an "unknown publisher" SmartScreen
+      # warning and macOS needs a right-click-Open to bypass Gatekeeper,
+      # until a code-signing certificate is added to this workflow.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apitab-desktop-${{ matrix.os }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.tar.gz
+            dist/*.AppImage
+          if-no-files-found: ignore
