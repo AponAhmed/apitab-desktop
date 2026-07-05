@@ -17,6 +17,7 @@ import { useCollectionStore } from '@/stores/collectionStore';
 import { useRequestStore } from '@/stores/requestStore';
 import { useEnvironmentStore } from '@/stores/environmentStore';
 import { useTeamStore } from '@/stores/teamStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useDialogStore } from '@/stores/dialogStore';
 import { toast } from '@/stores/toastStore';
 import { IconButton } from '@/components/ui/IconButton';
@@ -198,13 +199,17 @@ interface WorkspaceGroup {
   collections: Collection[];
 }
 
-/** Groups collections into "My Workspace" (personal) + one section per team, so shared and own collections read as visually distinct spaces. */
-function groupByWorkspace(collections: Collection[], teams: { id: string; name: string; role: TeamRole }[]): WorkspaceGroup[] {
+/** Groups collections into a personal section + one per team, so shared and own collections read as visually distinct spaces. */
+function groupByWorkspace(
+  collections: Collection[],
+  teams: { id: string; name: string; role: TeamRole }[],
+  personalLabel: string,
+): WorkspaceGroup[] {
   const groups: WorkspaceGroup[] = [];
 
   const personal = collections.filter((c) => !c.teamId);
   if (personal.length > 0) {
-    groups.push({ key: 'personal', label: 'My Workspace', isTeam: false, collections: personal });
+    groups.push({ key: 'personal', label: personalLabel, isTeam: false, collections: personal });
   }
 
   for (const team of teams) {
@@ -254,6 +259,8 @@ export function CollectionsPanel() {
   const activeRequestId = useRequestStore((s) => s.savedRef?.requestId ?? null);
   const openShareToTeam = useDialogStore((s) => s.openShareToTeam);
   const teams = useTeamStore((s) => s.teams);
+  const personalWorkspaceName = useSettingsStore((s) => s.personalWorkspaceName);
+  const setPersonalWorkspaceName = useSettingsStore((s) => s.setPersonalWorkspaceName);
 
   const environments = useEnvironmentStore((s) => s.environments);
   const activeEnvId = useEnvironmentStore((s) => s.activeEnvironmentId);
@@ -269,6 +276,7 @@ export function CollectionsPanel() {
   const [deleteTarget, setDeleteTarget] = useState<
     { id: string; name: string; kind: 'container' | 'request' } | null
   >(null);
+  const [personalRenameOpen, setPersonalRenameOpen] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const importTarget = useRef<string | null>(null);
@@ -286,7 +294,10 @@ export function CollectionsPanel() {
     [collections, q],
   );
 
-  const groups = useMemo(() => groupByWorkspace(visible, teams), [visible, teams]);
+  const groups = useMemo(
+    () => groupByWorkspace(visible, teams, personalWorkspaceName),
+    [visible, teams, personalWorkspaceName],
+  );
 
   const actions: CollectionActions = {
     activeRequestId,
@@ -406,7 +417,7 @@ export function CollectionsPanel() {
               <div key={group.key} className="mb-3">
                 <div
                   className={cn(
-                    'mb-1 flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide',
+                    'group/ws mb-1 flex items-center gap-1.5 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide',
                     group.isTeam ? 'text-brand-600 dark:text-brand-400' : 'text-slate-400 dark:text-slate-500',
                   )}
                 >
@@ -427,6 +438,16 @@ export function CollectionsPanel() {
                     >
                       {group.role}
                     </span>
+                  )}
+                  {!group.isTeam && (
+                    <button
+                      onClick={() => setPersonalRenameOpen(true)}
+                      title="Rename workspace"
+                      aria-label="Rename workspace"
+                      className="ml-auto shrink-0 rounded p-0.5 text-slate-400 opacity-0 hover:bg-slate-200 hover:text-slate-600 group-hover/ws:opacity-100 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
                   )}
                 </div>
                 <div
@@ -490,6 +511,15 @@ export function CollectionsPanel() {
         confirmLabel="Rename"
         onConfirm={(v) => renameTarget && renameContainer(renameTarget.id, v)}
         onClose={() => setRenameTarget(null)}
+      />
+      <PromptDialog
+        open={personalRenameOpen}
+        title="Rename Workspace"
+        label="Workspace name"
+        initialValue={personalWorkspaceName}
+        confirmLabel="Rename"
+        onConfirm={(v) => setPersonalWorkspaceName(v)}
+        onClose={() => setPersonalRenameOpen(false)}
       />
       <ConfirmDialog
         open={!!deleteTarget}
