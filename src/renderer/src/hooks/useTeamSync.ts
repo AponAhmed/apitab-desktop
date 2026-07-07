@@ -5,8 +5,8 @@ import { useTeamStore } from '@/stores/teamStore';
 
 /** Poll cadence while an ApiTab page is open and focused — fast enough that a freshly-shared collection's Accept/Decline popover shows up without a re-login. */
 const FOCUSED_POLL_MS = 7_000;
-/** Cadence while open but unfocused (or, in the extension, whenever no page has focus at all) — falls back toward the old blanket 60s rate. */
-const BLURRED_POLL_MS = 60_000;
+/** Cadence while open but unfocused (or, in the extension, whenever no page has focus at all). */
+const BLURRED_POLL_MS = 600_000; // 10 minutes
 
 /**
  * Wires the push-on-mutation watcher (once per page) and triggers an
