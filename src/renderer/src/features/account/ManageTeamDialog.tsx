@@ -1,12 +1,16 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useTeamStore } from '@/stores/teamStore';
+import { useAccountStore } from '@/stores/accountStore';
 import { apiClient, ApiError } from '@/services/apiClient';
 import { toast } from '@/stores/toastStore';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
-import type { TeamRole } from '@/types';
+import { Menu } from '@/components/ui/Menu';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { UserMinus } from 'lucide-react';
+import type { TeamMember, TeamRole } from '@/types';
 
 export function ManageTeamDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const activeTeamId = useTeamStore((s) => s.activeTeamId);
@@ -14,14 +18,33 @@ export function ManageTeamDialog({ open, onClose }: { open: boolean; onClose: ()
   const membersRecord = useTeamStore((s) => s.members);
   const setMembers = useTeamStore((s) => s.setMembers);
   const addMemberToStore = useTeamStore((s) => s.addMemberToStore);
+  const removeMemberFromStore = useTeamStore((s) => s.removeMemberFromStore);
+  const currentUserId = useAccountStore((s) => s.session?.user.id ?? null);
 
   const team = teams.find((t) => t.id === activeTeamId);
   const members = activeTeamId ? (membersRecord[activeTeamId] ?? []) : [];
+  const myRole = members.find((m) => m.userId === currentUserId)?.role;
 
   const [loading, setLoading] = useState(false);
   const [membersLoading, setMembersLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Extract<TeamRole, 'admin' | 'member'>>('member');
+  const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
+
+  /** Mirrors TeamPolicy::removeMember server-side: never the owner; owner removes anyone else; admin removes plain members only. */
+  const canRemove = (m: TeamMember) =>
+    m.userId !== team?.ownerId && (myRole === 'owner' || (myRole === 'admin' && m.role === 'member'));
+
+  const handleRemove = async () => {
+    if (!activeTeamId || !removeTarget) return;
+    try {
+      await apiClient.removeTeamMember(activeTeamId, removeTarget.userId);
+      removeMemberFromStore(activeTeamId, removeTarget.userId);
+      toast.success(`Removed ${removeTarget.name} from the team`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to remove member');
+    }
+  };
 
   // Load members when the dialog opens.
   useEffect(() => {
@@ -99,7 +122,7 @@ export function ManageTeamDialog({ open, onClose }: { open: boolean; onClose: ()
             ) : (
               <ul className="divide-y divide-slate-100 dark:divide-slate-800/60">
                 {members.map((m) => (
-                  <li key={m.userId} className="flex items-center justify-between p-3">
+                  <li key={m.userId} className="flex items-center justify-between gap-2 p-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
                         {m.name}
@@ -108,9 +131,24 @@ export function ManageTeamDialog({ open, onClose }: { open: boolean; onClose: ()
                         {m.email}
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold capitalize text-slate-800 dark:bg-slate-800 dark:text-slate-300">
-                      {m.role}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold capitalize text-slate-800 dark:bg-slate-800 dark:text-slate-300">
+                        {m.role}
+                      </span>
+                      {canRemove(m) && (
+                        <Menu
+                          label="Member actions"
+                          items={[
+                            {
+                              label: 'Remove from team',
+                              icon: UserMinus,
+                              danger: true,
+                              onClick: () => setRemoveTarget(m),
+                            },
+                          ]}
+                        />
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -118,6 +156,20 @@ export function ManageTeamDialog({ open, onClose }: { open: boolean; onClose: ()
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!removeTarget}
+        title="Remove member"
+        message={
+          <>
+            Remove <b>{removeTarget?.name}</b> from the team? They'll lose access to this team's
+            shared collections.
+          </>
+        }
+        confirmLabel="Remove"
+        onConfirm={() => void handleRemove()}
+        onClose={() => setRemoveTarget(null)}
+      />
     </Modal>
   );
 }

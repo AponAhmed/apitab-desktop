@@ -6,6 +6,12 @@ import { storageClear, storageGet, storageRemove, storageSet } from './store';
 import type { PreparedRequest } from '@shared/types';
 import icon from '../../resources/icon.png?asset';
 
+// Works around a known Electron/Windows bug where opening a native <select>
+// dropdown (e.g. Auth Type) can leave the GPU compositor rendering the
+// window black on certain GPU driver setups, surviving relaunch since it's
+// a driver/compositor state issue rather than app state.
+app.disableHardwareAcceleration();
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1280,

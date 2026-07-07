@@ -10,4 +10,5 @@ export * from './backup';
 export * from './account';
 export * from './team';
 export * from './teamVariable';
+export * from './collectionAssignment';
 export * from './sync';

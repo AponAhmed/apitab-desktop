@@ -4,12 +4,15 @@ import {
   useRef,
   useState,
   type InputHTMLAttributes,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
+  type SyntheticEvent,
 } from 'react';
 import { cn } from '@/utils/cn';
-import { tokenizeVariables } from '@/utils/variables';
+import { findOpenVariableTrigger, tokenizeVariables } from '@/utils/variables';
 import { useActiveVariables } from '@/hooks/useActiveVariables';
 import { VariablePopover } from './VariablePopover';
+import { VariableAutocomplete } from './VariableAutocomplete';
 
 type BaseProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'className'>;
 
@@ -36,6 +39,14 @@ interface ActiveVar {
   y: number;
 }
 
+interface AutocompleteState {
+  triggerStart: number;
+  query: string;
+  x: number;
+  y: number;
+  highlightedIndex: number;
+}
+
 export function VariableInput({
   value,
   onValueChange,
@@ -56,6 +67,13 @@ export function VariableInput({
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const overPopover = useRef(false);
   const popoverFocused = useRef(false);
+
+  const [autocomplete, setAutocomplete] = useState<AutocompleteState | null>(null);
+  const autocompleteNames = useMemo(() => {
+    if (!autocomplete) return [];
+    const q = autocomplete.query.toLowerCase();
+    return Object.keys(vars).filter((name) => name.toLowerCase().includes(q));
+  }, [autocomplete, vars]);
 
   const syncScroll = () => {
     const input = inputRef.current;
@@ -110,6 +128,67 @@ export function VariableInput({
     }
   };
 
+  const updateAutocomplete = (val: string, caret: number) => {
+    const trigger = findOpenVariableTrigger(val, caret);
+    const input = inputRef.current;
+    if (!trigger || !input) {
+      setAutocomplete(null);
+      return;
+    }
+    const cs = getComputedStyle(input);
+    const font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const padL = parseFloat(cs.paddingLeft) || 0;
+    const rect = input.getBoundingClientRect();
+    const left = measureText(val.slice(0, trigger.triggerStart), font);
+    const anchor = Math.max(0, Math.min(left + padL - input.scrollLeft, rect.width - 16));
+    const x = Math.max(8, Math.min(rect.left + anchor, window.innerWidth - 232));
+    setAutocomplete({ triggerStart: trigger.triggerStart, query: trigger.query, x, y: rect.bottom + 4, highlightedIndex: 0 });
+  };
+
+  const insertVariable = (name: string) => {
+    if (!autocomplete) return;
+    const input = inputRef.current;
+    const caret = input?.selectionStart ?? value.length;
+    const newValue = `${value.slice(0, autocomplete.triggerStart)}{{${name}}}${value.slice(caret)}`;
+    onValueChange(newValue);
+    setAutocomplete(null);
+    requestAnimationFrame(() => {
+      const pos = autocomplete.triggerStart + name.length + 4; // '{{' + name + '}}'
+      input?.setSelectionRange(pos, pos);
+      input?.focus();
+    });
+  };
+
+  const onSelect = (e: SyntheticEvent<HTMLInputElement>) => {
+    updateAutocomplete(e.currentTarget.value, e.currentTarget.selectionStart ?? 0);
+  };
+
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (!autocomplete) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setAutocomplete((s) =>
+        s && autocompleteNames.length > 0
+          ? { ...s, highlightedIndex: (s.highlightedIndex + 1) % autocompleteNames.length }
+          : s,
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setAutocomplete((s) =>
+        s && autocompleteNames.length > 0
+          ? { ...s, highlightedIndex: (s.highlightedIndex - 1 + autocompleteNames.length) % autocompleteNames.length }
+          : s,
+      );
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      if (autocompleteNames.length === 0) return;
+      e.preventDefault();
+      insertVariable(autocompleteNames[autocomplete.highlightedIndex]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setAutocomplete(null);
+    }
+  };
+
   const pad = variant === 'box' ? 'px-2.5' : 'px-2';
 
   return (
@@ -159,7 +238,13 @@ export function VariableInput({
         <input
           ref={inputRef}
           value={value}
-          onChange={(e) => onValueChange(e.target.value)}
+          onChange={(e) => {
+            onValueChange(e.target.value);
+            updateAutocomplete(e.target.value, e.target.selectionStart ?? e.target.value.length);
+          }}
+          onSelect={onSelect}
+          onKeyDown={onKeyDown}
+          onBlur={() => setAutocomplete(null)}
           onScroll={syncScroll}
           onMouseMove={onMouseMove}
           onMouseLeave={scheduleHide}
@@ -172,6 +257,17 @@ export function VariableInput({
           {...rest}
         />
       </div>
+
+      {autocomplete && (
+        <VariableAutocomplete
+          names={autocompleteNames}
+          highlightedIndex={autocomplete.highlightedIndex}
+          x={autocomplete.x}
+          y={autocomplete.y}
+          onSelect={insertVariable}
+          onHighlight={(i) => setAutocomplete((s) => (s ? { ...s, highlightedIndex: i } : s))}
+        />
+      )}
 
       {active && (
         <VariablePopover

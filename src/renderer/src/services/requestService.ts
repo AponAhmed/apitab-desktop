@@ -1,5 +1,5 @@
 import { resolveString, type VariableMap } from '@/utils/variables';
-import { splitUrl, urlWithParams } from '@/utils/query';
+import { applyPathVariables, splitUrl, urlWithParams } from '@/utils/query';
 import { sendExecuteRequest, type WireRequest } from './messaging';
 import type {
   ApiRequest,
@@ -53,7 +53,9 @@ export function prepareRequest(request: ApiRequest, vars: VariableMap = {}): Pre
     }
   }
 
-  const base = splitUrl(resolveString(request.url, vars)).base;
+  const resolvedUrl = resolveString(request.url, vars);
+  const withPathVars = applyPathVariables(resolvedUrl, request.pathVariables ?? [], vars);
+  const base = splitUrl(withPathVars).base;
   const url = params.length ? urlWithParams(base, params) : base;
 
   // Body.

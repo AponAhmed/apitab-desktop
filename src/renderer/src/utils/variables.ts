@@ -43,6 +43,7 @@ export interface VarSegment {
 /** Splits text into plain and `{{variable}}` segments for highlighting. */
 export function tokenizeVariables(input: string): VarSegment[] {
   const segments: VarSegment[] = [];
+  if (!input) return segments;
   let last = 0;
   for (const m of input.matchAll(VARIABLE_PATTERN)) {
     const idx = m.index ?? 0;
@@ -61,4 +62,30 @@ export function tokenizeVariables(input: string): VarSegment[] {
 /** True when the text references at least one `{{variable}}`. */
 export function hasVariables(input: string): boolean {
   return input.indexOf('{{') !== -1 && /\{\{\s*[\w.-]+\s*\}\}/.test(input);
+}
+
+export interface OpenVariableTrigger {
+  /** Index (into `text`) where the triggering `{{` starts. */
+  triggerStart: number;
+  /** Partial variable name typed so far — the autocomplete filter query. */
+  query: string;
+}
+
+/**
+ * If the caret sits just after an unclosed `{{` (not yet followed by `}}`),
+ * returns where that `{{` starts and the partial name typed so far. Returns
+ * `null` when there's no nearby unclosed `{{`, it's already closed, or the
+ * in-between text couldn't be a variable name (e.g. contains a space run
+ * that isn't just leading whitespace).
+ */
+export function findOpenVariableTrigger(text: string, caret: number): OpenVariableTrigger | null {
+  const CAP = 64; // variable names are short; cap the backward scan
+  const from = Math.max(0, caret - CAP);
+  const slice = text.slice(from, caret);
+  const openIdx = slice.lastIndexOf('{{');
+  if (openIdx === -1) return null;
+  const between = slice.slice(openIdx + 2);
+  if (between.includes('}}') || between.includes('{{')) return null;
+  if (!/^\s*[\w.-]*$/.test(between)) return null;
+  return { triggerStart: from + openIdx, query: between.trim() };
 }

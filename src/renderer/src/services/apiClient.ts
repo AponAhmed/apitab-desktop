@@ -1,6 +1,15 @@
 import { API_BASE_URL, API_KEY } from '@/config/server';
 import { useAccountStore } from '@/stores/accountStore';
-import type { AuthSession, Collection, SyncResponse, Team, TeamMember, TeamVariable } from '@/types';
+import type {
+  AuthSession,
+  Collection,
+  CollectionAssigneeStatus,
+  PendingAssignment,
+  SyncResponse,
+  Team,
+  TeamMember,
+  TeamVariable,
+} from '@/types';
 
 export class ApiError extends Error {
   status: number;
@@ -114,7 +123,7 @@ export const apiClient = {
   fetchTeamCollections: (teamId: string) =>
     request<{ collections: Collection[] }>('GET', `/teams/${teamId}/collections`),
 
-  createRemoteCollection: (teamId: string, collection: Collection) =>
+  createRemoteCollection: (teamId: string, collection: Collection, userIds: string[] = []) =>
     request<Collection>('POST', `/teams/${teamId}/collections`, {
       id: collection.id,
       name: collection.name,
@@ -122,6 +131,7 @@ export const apiClient = {
       requests: collection.requests,
       createdAt: collection.createdAt,
       updatedAt: collection.updatedAt,
+      ...(userIds.length ? { userIds } : {}),
     }),
 
   updateRemoteCollection: (teamId: string, collection: Collection) =>
@@ -160,4 +170,33 @@ export const apiClient = {
 
   deleteTeamVariable: (teamId: string, variableId: string) =>
     request<{ message: string }>('DELETE', `/teams/${teamId}/variables/${variableId}`),
+
+  removeTeamMember: (teamId: string, userId: string) =>
+    request<{ message: string }>('DELETE', `/teams/${teamId}/members/${userId}`),
+
+  fetchPendingAssignments: () =>
+    request<{ assignments: PendingAssignment[] }>('GET', '/assignments/pending'),
+
+  acceptAssignment: (assignmentId: string) =>
+    request<{ message: string }>('POST', `/assignments/${assignmentId}/accept`),
+
+  declineAssignment: (assignmentId: string) =>
+    request<{ message: string }>('POST', `/assignments/${assignmentId}/decline`),
+
+  fetchCollectionAssignments: (teamId: string, collectionId: string) =>
+    request<{ assignments: CollectionAssigneeStatus[] }>(
+      'GET',
+      `/teams/${teamId}/collections/${collectionId}/assignments`,
+    ),
+
+  assignCollection: (teamId: string, collectionId: string, userIds: string[]) =>
+    request<{ message: string }>('POST', `/teams/${teamId}/collections/${collectionId}/assignments`, {
+      userIds,
+    }),
+
+  leaveTeamCollection: (teamId: string, collectionId: string) =>
+    request<{ message: string; collectionId: string }>(
+      'POST',
+      `/teams/${teamId}/collections/${collectionId}/leave`,
+    ),
 };

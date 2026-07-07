@@ -16,6 +16,7 @@ interface TeamState {
   setActiveTeam: (id: string | null) => void;
   setMembers: (teamId: string, members: TeamMember[]) => void;
   addMemberToStore: (teamId: string, member: TeamMember) => void;
+  removeMemberFromStore: (teamId: string, userId: string) => void;
   recordSync: (teamId: string, serverTime: number) => void;
   setSyncing: (syncing: boolean) => void;
   setSyncError: (error: string | null) => void;
@@ -47,6 +48,13 @@ export const useTeamStore = create<TeamState>()(
           members: {
             ...s.members,
             [teamId]: [...(s.members[teamId] || []), member],
+          },
+        })),
+      removeMemberFromStore: (teamId, userId) =>
+        set((s) => ({
+          members: {
+            ...s.members,
+            [teamId]: (s.members[teamId] || []).filter((m) => m.userId !== userId),
           },
         })),
       recordSync: (teamId, serverTime) =>

@@ -21,6 +21,8 @@ export interface Collection {
   updatedAt: number;
   /** Set when this collection is shared with a team; absent = local-only. */
   teamId?: string;
+  /** The user id of whoever created this collection (from the team backend). Absent for local-only or pre-existing synced collections. */
+  createdBy?: string;
 }
 
 /** Anything that holds folders + requests — a collection root or a folder. */

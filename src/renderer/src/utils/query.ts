@@ -1,4 +1,5 @@
 import { emptyKeyValue } from './defaults';
+import { resolveString, type VariableMap } from './variables';
 import type { KeyValue } from '@/types';
 
 /**
@@ -64,4 +65,41 @@ export function urlWithParams(url: string, params: KeyValue[]): string {
   const { base, hash } = splitUrl(url);
   const query = paramsToQuery(params);
   return `${base}${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`;
+}
+
+/** Matches a whole path segment like `:id` (not `://`, which never appears as its own segment). */
+const PATH_VAR_SEGMENT = /^:([a-zA-Z_][a-zA-Z0-9_]*)$/;
+
+/** Extracts distinct `:name` path segment names from a URL's base path, in first-seen order. */
+export function pathVariableNamesFromUrl(url: string): string[] {
+  const { base } = splitUrl(url);
+  const names: string[] = [];
+  for (const segment of base.split('/')) {
+    const match = PATH_VAR_SEGMENT.exec(segment);
+    if (match && !names.includes(match[1])) names.push(match[1]);
+  }
+  return names;
+}
+
+/**
+ * Replaces `:name` path segments with their resolved values (enabled rows
+ * only; a disabled or unmatched `:name` is left as literal text). Query
+ * string and hash are passed through untouched.
+ */
+export function applyPathVariables(url: string, pathVariables: KeyValue[], vars: VariableMap): string {
+  const valueByName = new Map(
+    pathVariables.filter((v) => v.enabled && v.key.trim() !== '').map((v) => [v.key, v.value]),
+  );
+  if (valueByName.size === 0) return url;
+  const { base, query, hash } = splitUrl(url);
+  const newBase = base
+    .split('/')
+    .map((segment) => {
+      const match = PATH_VAR_SEGMENT.exec(segment);
+      if (!match) return segment;
+      const value = valueByName.get(match[1]);
+      return value !== undefined ? resolveString(value, vars) : segment;
+    })
+    .join('/');
+  return `${newBase}${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`;
 }
