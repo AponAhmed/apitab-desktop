@@ -75,7 +75,7 @@ function RequestNode({
       onClick={() => actions.openRequest(containerId, request)}
       style={{ paddingLeft: depth * INDENT + 6 }}
       className={cn(
-        'group flex cursor-pointer items-center gap-1.5 rounded-md py-1 pr-1 hover:bg-slate-100 dark:hover:bg-slate-800/70',
+        'group flex cursor-pointer items-center gap-1.5 rounded-md py-0.5 pr-1 hover:bg-slate-100 dark:hover:bg-slate-800/70',
         active && 'bg-brand-50 dark:bg-brand-950/40',
       )}
     >
@@ -142,7 +142,7 @@ function ContainerNode({
     <div>
       <div
         style={{ paddingLeft: depth * INDENT + 4 }}
-        className="group flex items-center gap-1 rounded-md py-1 pr-1 hover:bg-slate-100 dark:hover:bg-slate-800/70"
+        className="group flex items-center gap-1 rounded-md py-0.5 pr-1 hover:bg-slate-100 dark:hover:bg-slate-800/70"
       >
         <button
           onClick={() => toggle(container.id)}

@@ -81,6 +81,31 @@ export function pathVariableNamesFromUrl(url: string): string[] {
   return names;
 }
 
+export interface PathVariableRange {
+  name: string;
+  start: number;
+  end: number;
+}
+
+/**
+ * Locates `:name` path-variable segments with their character offsets into
+ * the original (untouched) URL string — used to highlight them distinctly
+ * from `{{variable}}` tokens in the URL bar. `base` is always a prefix of
+ * `url` (splitUrl only truncates at `?`/`#`), so positions found within it
+ * map 1:1 back onto `url`.
+ */
+export function findPathVariableRanges(url: string): PathVariableRange[] {
+  const { base } = splitUrl(url);
+  const ranges: PathVariableRange[] = [];
+  let pos = 0;
+  for (const segment of base.split('/')) {
+    const match = PATH_VAR_SEGMENT.exec(segment);
+    if (match) ranges.push({ name: match[1], start: pos, end: pos + segment.length });
+    pos += segment.length + 1; // +1 for the '/' consumed by split
+  }
+  return ranges;
+}
+
 /**
  * Replaces `:name` path segments with their resolved values (enabled rows
  * only; a disabled or unmatched `:name` is left as literal text). Query

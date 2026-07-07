@@ -212,7 +212,7 @@ export function KeyValueEditor({
             {readOnlyKeys ? (
               <span
                 className={cn(
-                  'truncate px-2 font-mono text-sm text-slate-600 dark:text-slate-300',
+                  'truncate px-2 font-mono text-sm text-violet-600 dark:text-violet-300',
                   dim && 'opacity-50',
                 )}
               >
