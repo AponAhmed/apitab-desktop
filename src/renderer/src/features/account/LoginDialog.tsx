@@ -383,6 +383,11 @@ export function LoginDialog() {
             Back to log in
           </button>
         )}
+
+        {/* The visible submit button lives in the Modal's footer, outside
+            this form's DOM subtree, so it can't be the browser's implicit
+            "submit on Enter" target — this invisible button gives it one. */}
+        <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
       </form>
     </Modal>
   );
