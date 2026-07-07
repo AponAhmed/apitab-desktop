@@ -199,4 +199,7 @@ export const apiClient = {
       'POST',
       `/teams/${teamId}/collections/${collectionId}/leave`,
     ),
+
+  unshareCollection: (teamId: string, collectionId: string) =>
+    request<{ message: string }>('POST', `/teams/${teamId}/collections/${collectionId}/unshare`),
 };
