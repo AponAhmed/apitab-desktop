@@ -38,6 +38,10 @@ jobs:
       # Unsigned builds: Windows shows an "unknown publisher" SmartScreen
       # warning and macOS needs a right-click-Open to bypass Gatekeeper,
       # until a code-signing certificate is added to this workflow.
+      # dist/*.yml (latest.yml / latest-mac.yml / latest-linux.yml) and
+      # *.blockmap are the electron-updater update-feed metadata — without
+      # them the in-app self-update check (main/autoUpdate.ts) can't find
+      # or verify new releases.
       - uses: actions/upload-artifact@v4
         with:
           name: apitab-desktop-${{ matrix.os }}
@@ -46,6 +50,8 @@ jobs:
             dist/*.dmg
             dist/*.tar.gz
             dist/*.AppImage
+            dist/*.yml
+            dist/*.blockmap
           if-no-files-found: ignore
 
   # Installers are too large for git (GitHub's 100MB per-file limit), so

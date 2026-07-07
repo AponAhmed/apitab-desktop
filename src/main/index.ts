@@ -3,6 +3,7 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron';
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { executeRequest } from './requestHandler';
 import { storageClear, storageGet, storageRemove, storageSet } from './store';
+import { registerAutoUpdate } from './autoUpdate';
 import type { PreparedRequest } from '@shared/types';
 import icon from '../../resources/icon.png?asset';
 
@@ -68,6 +69,8 @@ app.whenReady().then(() => {
 
   // Desktop equivalent of the extension's `browser.runtime.getManifest().version`.
   ipcMain.handle('app:getVersion', () => app.getVersion());
+
+  registerAutoUpdate();
 
   createWindow();
 

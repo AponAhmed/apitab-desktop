@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { electronAPI } from '@electron-toolkit/preload';
-import type { AppApi, PreparedRequest, RequestResult, StorageApi } from '@shared/types';
+import type { AppApi, PreparedRequest, RequestResult, StorageApi, UpdateApi, UpdateStatus } from '@shared/types';
 
 /**
  * Renderer-facing API surface, matching the extension's two touchpoints with
@@ -23,6 +23,19 @@ const api = {
   app: {
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
   } satisfies AppApi,
+  update: {
+    getStatus: () => ipcRenderer.invoke('update:getStatus'),
+    check: () => ipcRenderer.invoke('update:check'),
+    download: () => ipcRenderer.invoke('update:download'),
+    install: () => ipcRenderer.invoke('update:install'),
+    onStatus: (cb: (status: UpdateStatus) => void) => {
+      const listener = (_event: unknown, status: UpdateStatus) => cb(status);
+      ipcRenderer.on('update:status', listener);
+      return () => {
+        ipcRenderer.removeListener('update:status', listener);
+      };
+    },
+  } satisfies UpdateApi,
 };
 
 export type Api = typeof api;
