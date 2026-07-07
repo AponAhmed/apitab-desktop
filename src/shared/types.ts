@@ -81,3 +81,27 @@ export interface StorageApi {
 export interface AppApi {
   getVersion(): Promise<string>;
 }
+
+/**
+ * Self-update flow backed by `electron-updater` (main/autoUpdate.ts), which
+ * checks GitHub Releases directly — no server involved. `unsupported` covers
+ * dev/unpacked runs, where electron-updater has no installed app to replace.
+ */
+export type UpdateStatus =
+  | { state: 'idle' }
+  | { state: 'checking' }
+  | { state: 'available'; version: string }
+  | { state: 'not-available' }
+  | { state: 'downloading'; percent: number }
+  | { state: 'downloaded'; version: string }
+  | { state: 'error'; message: string }
+  | { state: 'unsupported' };
+
+export interface UpdateApi {
+  getStatus(): Promise<UpdateStatus>;
+  check(): Promise<void>;
+  download(): Promise<void>;
+  install(): Promise<void>;
+  /** Returns an unsubscribe function. */
+  onStatus(cb: (status: UpdateStatus) => void): () => void;
+}

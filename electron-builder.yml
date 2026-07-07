@@ -15,6 +15,13 @@ files:
   - '!{README.md,CHANGELOG.md}'
 asarUnpack:
   - resources/**
+# Lets electron-updater (main/autoUpdate.ts) know where to check for new
+# releases. Public repo, so no token is needed at update-check time; CI still
+# publishes releases itself via softprops/action-gh-release (see build.yml).
+publish:
+  provider: github
+  owner: AponAhmed
+  repo: apitab-desktop
 win:
   executableName: apitab-desktop
   target:
