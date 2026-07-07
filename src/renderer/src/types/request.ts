@@ -79,6 +79,8 @@ export interface ApiRequest {
   method: HttpMethod;
   url: string;
   params: KeyValue[];
+  /** `:name` segments detected in the URL's path — see utils/query.ts. */
+  pathVariables: KeyValue[];
   headers: KeyValue[];
   auth: AuthConfig;
   body: RequestBody;

@@ -8,6 +8,7 @@ import { AboutDialog } from '@/components/AboutDialog';
 import { EnvironmentSelector } from '@/features/environments/EnvironmentSelector';
 import { TeamSelector, SyncButton, AccountAvatar } from '@/features/account/AccountMenu';
 import { LoginDialog } from '@/features/account/LoginDialog';
+import { PendingAssignmentsBell } from '@/components/PendingAssignmentsBell';
 
 export function TopBar() {
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
@@ -34,6 +35,7 @@ export function TopBar() {
         <div className="mx-1.5 h-4 w-px bg-slate-200 dark:bg-slate-700" />
         <TeamSelector />
         <SyncButton />
+        <PendingAssignmentsBell />
       </div>
 
       <div className="flex items-center gap-0.5">

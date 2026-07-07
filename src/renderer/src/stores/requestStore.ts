@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { createRequest, emptyKeyValue } from '@/utils/defaults';
 import { formatJson } from '@/utils/json';
-import { paramsFromUrl, urlWithParams } from '@/utils/query';
+import { paramsFromUrl, pathVariableNamesFromUrl, urlWithParams } from '@/utils/query';
 import { uuid } from '@/utils/id';
 import { executeRequest, prepareRequest } from '@/services/requestService';
 import { runScript } from '@/services/scriptRunner';
@@ -66,6 +66,18 @@ function withTrailingRow(rows: KeyValue[]): KeyValue[] {
   return sanitized;
 }
 
+/**
+ * Derives path-variable rows from `:name` segments in the URL, preserving
+ * each existing row's value/enabled state for names that still appear (and
+ * dropping/adding rows as the URL text changes) — there's no manual
+ * add/remove for these, unlike params/headers.
+ */
+function syncPathVariables(url: string, existing: KeyValue[]): KeyValue[] {
+  const names = pathVariableNamesFromUrl(url);
+  const byName = new Map(existing.map(sanitizeKeyValue).map((kv) => [kv.key, kv]));
+  return names.map((name) => byName.get(name) ?? emptyKeyValue({ key: name }));
+}
+
 /** Snapshot of a request's last outcome, cached so switching between saved
  * requests shows each one's own last response instead of a blank panel. */
 export interface CachedResponse {
@@ -92,9 +104,19 @@ function normalizeForEditing(req: ApiRequest): ApiRequest {
     ...req,
     auth: {
       type: req.auth?.type ?? 'none',
-      bearer: { ...base.auth.bearer, ...req.auth?.bearer },
-      basic: { ...base.auth.basic, ...req.auth?.basic },
-      apiKey: { ...base.auth.apiKey, ...req.auth?.apiKey },
+      // Field-by-field (not a spread merge) so an explicit `null` surviving
+      // from a corrupted/imported request is coerced back to a safe string
+      // instead of overriding the default and crashing VariableInput/Input.
+      bearer: { token: req.auth?.bearer?.token ?? '' },
+      basic: {
+        username: req.auth?.basic?.username ?? '',
+        password: req.auth?.basic?.password ?? '',
+      },
+      apiKey: {
+        key: req.auth?.apiKey?.key ?? '',
+        value: req.auth?.apiKey?.value ?? '',
+        addTo: req.auth?.apiKey?.addTo ?? 'header',
+      },
     },
     body: {
       ...base.body,
@@ -107,6 +129,7 @@ function normalizeForEditing(req: ApiRequest): ApiRequest {
       postResponse: req.scripts?.postResponse ?? '',
     },
     params: withTrailingRow(req.params ?? []),
+    pathVariables: syncPathVariables(req.url ?? '', req.pathVariables ?? []),
     headers: withTrailingRow(req.headers ?? []),
   };
   return merged;
@@ -133,6 +156,9 @@ interface RequestState {
   // Query params (kept in sync with the URL)
   updateParam: (id: string, patch: Partial<KeyValue>) => void;
   removeParam: (id: string) => void;
+
+  // Path variables (derived from `:name` segments in the URL — no remove/add, only edit)
+  updatePathVariable: (id: string, patch: Partial<KeyValue>) => void;
 
   // Headers
   updateHeader: (id: string, patch: Partial<KeyValue>) => void;
@@ -196,7 +222,12 @@ export const useRequestStore = create<RequestState>()(
         setMethod: (method) => patch((r) => ({ ...r, method })),
 
         setUrl: (url) =>
-          patch((r) => ({ ...r, url, params: withTrailingRow(paramsFromUrl(url)) })),
+          patch((r) => ({
+            ...r,
+            url,
+            params: withTrailingRow(paramsFromUrl(url)),
+            pathVariables: syncPathVariables(url, r.pathVariables),
+          })),
 
         setName: (name) => patch((r) => ({ ...r, name })),
 
@@ -213,6 +244,12 @@ export const useRequestStore = create<RequestState>()(
             const params = withTrailingRow(r.params.filter((kv) => kv.id !== id));
             return { ...r, params, url: urlWithParams(r.url, params) };
           }),
+
+        updatePathVariable: (id, p) =>
+          patch((r) => ({
+            ...r,
+            pathVariables: r.pathVariables.map((kv) => (kv.id === id ? { ...kv, ...p } : kv)),
+          })),
 
         updateHeader: (id, p) =>
           patch((r) => ({

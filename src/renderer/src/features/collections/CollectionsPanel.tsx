@@ -17,6 +17,7 @@ import { useCollectionStore } from '@/stores/collectionStore';
 import { useRequestStore } from '@/stores/requestStore';
 import { useEnvironmentStore } from '@/stores/environmentStore';
 import { useTeamStore } from '@/stores/teamStore';
+import { useAccountStore } from '@/stores/accountStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useDialogStore } from '@/stores/dialogStore';
 import { toast } from '@/stores/toastStore';
@@ -97,6 +98,7 @@ function ContainerNode({
   collapsed,
   toggle,
   role,
+  currentUserId,
 }: {
   container: Container;
   depth: number;
@@ -104,10 +106,14 @@ function ContainerNode({
   toggle: (id: string) => void;
   /** This device's role on the owning team, when `container` is a shared root collection. */
   role?: TeamRole;
+  currentUserId?: string | null;
 }) {
   const actions = useActions();
   const root = isCollection(container);
   const teamId = root ? (container as Collection).teamId : undefined;
+  const createdBy = root ? (container as Collection).createdBy : undefined;
+  const canManageAccess =
+    root && !!teamId && (role === 'owner' || role === 'admin' || createdBy === currentUserId);
   const isCollapsed = !!collapsed[container.id];
   const empty = container.folders.length === 0 && container.requests.length === 0;
 
@@ -119,6 +125,9 @@ function ContainerNode({
     { label: 'Import here', icon: Upload, onClick: () => actions.importInto(container.id) },
     ...(root && !teamId
       ? [{ label: 'Share to team…', icon: Users, onClick: () => actions.shareToTeam(container.id) }]
+      : []),
+    ...(canManageAccess
+      ? [{ label: 'Manage access…', icon: Users, onClick: () => actions.shareToTeam(container.id) }]
       : []),
     {
       label: root ? 'Delete collection' : 'Delete folder',
@@ -204,6 +213,7 @@ function groupByWorkspace(
   collections: Collection[],
   teams: { id: string; name: string; role: TeamRole }[],
   personalLabel: string,
+  currentUserId: string | null,
 ): WorkspaceGroup[] {
   const groups: WorkspaceGroup[] = [];
 
@@ -220,10 +230,14 @@ function groupByWorkspace(
   }
 
   // A collection tagged with a team this device no longer recognizes (left
-  // the team, or hasn't synced its membership yet) — still show it rather
-  // than silently dropping it from view.
+  // the team, or the team was deleted). Only keep showing it if it might be
+  // this user's own (created it, or we can't tell because it predates
+  // `createdBy` / came from an older sync) — someone else's collection in a
+  // team we no longer belong to should simply disappear, not linger forever.
   const knownTeamIds = new Set(teams.map((t) => t.id));
-  const orphaned = collections.filter((c) => c.teamId && !knownTeamIds.has(c.teamId));
+  const orphaned = collections.filter(
+    (c) => c.teamId && !knownTeamIds.has(c.teamId) && (!c.createdBy || c.createdBy === currentUserId),
+  );
   if (orphaned.length > 0) {
     groups.push({ key: 'orphaned', label: 'Shared (team unavailable)', isTeam: true, collections: orphaned });
   }
@@ -259,6 +273,7 @@ export function CollectionsPanel() {
   const activeRequestId = useRequestStore((s) => s.savedRef?.requestId ?? null);
   const openShareToTeam = useDialogStore((s) => s.openShareToTeam);
   const teams = useTeamStore((s) => s.teams);
+  const currentUserId = useAccountStore((s) => s.session?.user.id ?? null);
   const personalWorkspaceName = useSettingsStore((s) => s.personalWorkspaceName);
   const setPersonalWorkspaceName = useSettingsStore((s) => s.setPersonalWorkspaceName);
 
@@ -295,8 +310,8 @@ export function CollectionsPanel() {
   );
 
   const groups = useMemo(
-    () => groupByWorkspace(visible, teams, personalWorkspaceName),
-    [visible, teams, personalWorkspaceName],
+    () => groupByWorkspace(visible, teams, personalWorkspaceName, currentUserId),
+    [visible, teams, personalWorkspaceName, currentUserId],
   );
 
   const actions: CollectionActions = {
@@ -464,6 +479,7 @@ export function CollectionsPanel() {
                       collapsed={q ? {} : collapsed}
                       toggle={toggle}
                       role={group.role}
+                      currentUserId={currentUserId}
                     />
                   ))}
                 </div>

@@ -1,7 +1,7 @@
 import { uuid } from './id';
 import { createRequest, defaultAuth, defaultBody, defaultScripts, emptyKeyValue } from './defaults';
 import { formatJson } from './json';
-import { paramsFromUrl } from './query';
+import { paramsFromUrl, pathVariableNamesFromUrl } from './query';
 import { COLLECTION_EXPORT_VERSION, type CollectionExport, type SharedVariable } from './collectionIO';
 import type {
   ApiRequest,
@@ -28,6 +28,8 @@ interface PostmanUrl {
   host?: string[] | string;
   path?: string[] | string;
   query?: { key?: string; value?: string; disabled?: boolean }[];
+  /** Postman's own recorded path-variable values, e.g. for `:id` in the path. */
+  variable?: { key?: string; value?: string }[];
 }
 
 interface PostmanHeader {
@@ -101,6 +103,17 @@ function urlToString(url: PostmanUrl | string | undefined): string {
     .map((q) => `${q.key ?? ''}=${q.value ?? ''}`)
     .join('&');
   return query ? `${base}?${query}` : base;
+}
+
+/** Builds path-variable rows for the `:name` segments actually present in `url`, using Postman's own recorded values where available. */
+function convertPathVariables(url: PostmanUrl | string | undefined, resolvedUrl: string): KeyValue[] {
+  const postmanVars = typeof url === 'object' ? (url.variable ?? []) : [];
+  const valueByName = new Map(
+    postmanVars.filter((v) => v.key).map((v) => [v.key as string, v.value ?? '']),
+  );
+  return pathVariableNamesFromUrl(resolvedUrl).map((name) =>
+    emptyKeyValue({ key: name, value: valueByName.get(name) ?? '' }),
+  );
 }
 
 function convertHeaders(headers: PostmanHeader[] | undefined): KeyValue[] {
@@ -228,6 +241,7 @@ function convertRequestItem(item: PostmanItem): ApiRequest {
     method: validMethod,
     url,
     params: [...paramsFromUrl(url), emptyKeyValue()],
+    pathVariables: convertPathVariables(req?.url, url),
     headers: [...convertHeaders(req?.header), emptyKeyValue()],
     auth: convertAuth(req?.auth),
     body: convertBody(req?.body),

@@ -44,6 +44,7 @@ export function createRequest(partial: Partial<ApiRequest> = {}): ApiRequest {
     method: 'GET',
     url: '',
     params: [emptyKeyValue()],
+    pathVariables: [],
     headers: [emptyKeyValue()],
     auth: defaultAuth(),
     body: defaultBody(),

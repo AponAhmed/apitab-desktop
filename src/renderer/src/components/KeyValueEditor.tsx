@@ -26,6 +26,10 @@ interface KeyValueEditorProps {
   showShareToggle?: boolean;
   sharedIds?: ReadonlySet<string>;
   onToggleShared?: (id: string) => void;
+  /** Renders the key cell as static text (e.g. path variables, whose names come from the URL, not free typing). */
+  readOnlyKeys?: boolean;
+  /** Hides the per-row remove button/column, for rows that can't be deleted individually. */
+  hideRemove?: boolean;
 }
 
 const inputClass =
@@ -158,10 +162,13 @@ export function KeyValueEditor({
   showShareToggle = false,
   sharedIds,
   onToggleShared,
+  readOnlyKeys = false,
+  hideRemove = false,
 }: KeyValueEditorProps) {
   const keyListId = useId();
   const valueListId = useId();
   const shareCol = showShareToggle ? ' 2rem' : '';
+  const removeCol = hideRemove ? '' : ' 2.25rem';
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
@@ -187,7 +194,7 @@ export function KeyValueEditor({
           <div
             key={row.id}
             style={{
-              gridTemplateColumns: `2.25rem ${columnRatio[0]} ${columnRatio[1]}${shareCol} 2.25rem`,
+              gridTemplateColumns: `2.25rem ${columnRatio[0]} ${columnRatio[1]}${shareCol}${removeCol}`,
             }}
             className={cn(
               'grid items-center',
@@ -202,14 +209,25 @@ export function KeyValueEditor({
                 className={cn(isTrailing && 'opacity-0')}
               />
             </div>
-            <Cell
-              value={row.key}
-              onChange={(v) => onChange(row.id, { key: v })}
-              placeholder={keyPlaceholder}
-              listId={keySuggestions ? keyListId : undefined}
-              dim={dim}
-              enableVariables={enableVariables}
-            />
+            {readOnlyKeys ? (
+              <span
+                className={cn(
+                  'truncate px-2 font-mono text-sm text-slate-600 dark:text-slate-300',
+                  dim && 'opacity-50',
+                )}
+              >
+                {row.key}
+              </span>
+            ) : (
+              <Cell
+                value={row.key}
+                onChange={(v) => onChange(row.id, { key: v })}
+                placeholder={keyPlaceholder}
+                listId={keySuggestions ? keyListId : undefined}
+                dim={dim}
+                enableVariables={enableVariables}
+              />
+            )}
             <ExpandableValueCell
               value={row.value}
               onChange={(v) => onChange(row.id, { value: v })}
@@ -236,13 +254,15 @@ export function KeyValueEditor({
                 )}
               </div>
             )}
-            <div className="grid place-items-center">
-              {!isTrailing && (
-                <IconButton size="sm" onClick={() => onRemove(row.id)} aria-label="Remove row">
-                  <Trash2 className="h-3.5 w-3.5" />
-                </IconButton>
-              )}
-            </div>
+            {!hideRemove && (
+              <div className="grid place-items-center">
+                {!isTrailing && (
+                  <IconButton size="sm" onClick={() => onRemove(row.id)} aria-label="Remove row">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </IconButton>
+                )}
+              </div>
+            )}
           </div>
         );
       })}
