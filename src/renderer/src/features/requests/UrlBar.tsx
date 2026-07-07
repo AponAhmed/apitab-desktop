@@ -53,6 +53,7 @@ export function UrlBar() {
         placeholder="https://api.example.com  or  {{base_url}}/users"
         className="flex-1"
         aria-label="Request URL"
+        highlightPathVars
       />
 
       <Button

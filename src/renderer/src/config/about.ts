@@ -16,8 +16,11 @@ export interface AboutLink {
 // shown in the About panel (top bar ⓘ) and the Options page.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** GitHub repository URL. */
-export const REPO_URL = 'https://github.com/AponAhmed/apitab';
+/** GitHub repository URL for this app (the desktop app itself). */
+export const REPO_URL = 'https://github.com/AponAhmed/apitab-desktop';
+
+/** The companion browser extension lives in a separate repo. */
+export const SIBLING_REPO_URL = 'https://github.com/AponAhmed/apitab';
 
 export const ABOUT = {
   tagline: 'Lightweight, local-first API testing — a fast, minimal alternative to Postman.',
@@ -35,6 +38,7 @@ export const ABOUT = {
   links: [
     { label: 'Source code', url: REPO_URL },
     { label: 'Report an issue', url: `${REPO_URL}/issues` },
+    { label: 'Browser extension repo', url: SIBLING_REPO_URL },
   ] satisfies AboutLink[],
 
   techStack: ['WXT', 'React', 'TypeScript', 'Tailwind CSS', 'Zustand'],

@@ -9,7 +9,8 @@ import {
   type SyntheticEvent,
 } from 'react';
 import { cn } from '@/utils/cn';
-import { findOpenVariableTrigger, tokenizeVariables } from '@/utils/variables';
+import { findOpenVariableTrigger, tokenizeVariables, type VarSegment } from '@/utils/variables';
+import { findPathVariableRanges } from '@/utils/query';
 import { useActiveVariables } from '@/hooks/useActiveVariables';
 import { VariablePopover } from './VariablePopover';
 import { VariableAutocomplete } from './VariableAutocomplete';
@@ -22,6 +23,40 @@ interface VariableInputProps extends BaseProps {
   className?: string;
   mono?: boolean;
   variant?: 'box' | 'bare';
+  /** Also highlight `:name` path-variable segments distinctly from `{{variables}}` — only meaningful for the URL bar. */
+  highlightPathVars?: boolean;
+}
+
+interface RenderSegment {
+  key: string;
+  text: string;
+  kind: 'text' | 'var' | 'pathvar';
+  varName?: string;
+}
+
+/** Merges `{{variable}}` segments with `:pathVar` ranges into one ordered list for the highlight overlay — the two never overlap (a variable name can't contain `:`). */
+function buildRenderSegments(
+  value: string,
+  varSegments: VarSegment[],
+  pathRanges: { name: string; start: number; end: number }[],
+): RenderSegment[] {
+  if (pathRanges.length === 0) {
+    return varSegments.map((s, i) => ({ key: String(i), text: s.value, kind: s.type, varName: s.name }));
+  }
+  const markers = [
+    ...varSegments.filter((s) => s.type === 'var').map((s) => ({ start: s.start, end: s.end, kind: 'var' as const, name: s.name })),
+    ...pathRanges.map((r) => ({ start: r.start, end: r.end, kind: 'pathvar' as const, name: r.name })),
+  ].sort((a, b) => a.start - b.start);
+
+  const out: RenderSegment[] = [];
+  let last = 0;
+  markers.forEach((m, i) => {
+    if (m.start > last) out.push({ key: `t${i}`, text: value.slice(last, m.start), kind: 'text' });
+    out.push({ key: `m${i}`, text: value.slice(m.start, m.end), kind: m.kind, varName: m.name });
+    last = m.end;
+  });
+  if (last < value.length) out.push({ key: 'tend', text: value.slice(last), kind: 'text' });
+  return out;
 }
 
 let measureCanvas: HTMLCanvasElement | null = null;
@@ -54,6 +89,7 @@ export function VariableInput({
   mono = true,
   variant = 'box',
   placeholder,
+  highlightPathVars = false,
   ...rest
 }: VariableInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -62,6 +98,14 @@ export function VariableInput({
 
   const segments = useMemo(() => tokenizeVariables(value), [value]);
   const hasVars = useMemo(() => segments.some((s) => s.type === 'var'), [segments]);
+  const pathVarRanges = useMemo(
+    () => (highlightPathVars ? findPathVariableRanges(value) : []),
+    [highlightPathVars, value],
+  );
+  const renderSegments = useMemo(
+    () => buildRenderSegments(value, segments, pathVarRanges),
+    [value, segments, pathVarRanges],
+  );
 
   const [active, setActive] = useState<ActiveVar | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -214,23 +258,35 @@ export function VariableInput({
             {value === '' ? (
               <span className="text-slate-400 dark:text-slate-500">{placeholder}</span>
             ) : (
-              segments.map((seg, i) =>
-                seg.type === 'var' ? (
-                  <span
-                    key={i}
-                    className={cn(
-                      'rounded-[3px]',
-                      seg.name && Object.prototype.hasOwnProperty.call(vars, seg.name)
-                        ? 'bg-brand-500/10 text-brand-600 dark:bg-brand-400/15 dark:text-brand-300'
-                        : 'bg-amber-500/10 text-amber-600 dark:bg-amber-400/15 dark:text-amber-400',
-                    )}
-                  >
-                    {seg.value}
-                  </span>
-                ) : (
-                  <span key={i}>{seg.value}</span>
-                ),
-              )
+              renderSegments.map((seg) => {
+                if (seg.kind === 'var') {
+                  const hasValue = seg.varName && Object.prototype.hasOwnProperty.call(vars, seg.varName);
+                  return (
+                    <span
+                      key={seg.key}
+                      className={cn(
+                        'rounded-[3px]',
+                        hasValue
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-400'
+                          : 'bg-amber-500/10 text-amber-600 dark:bg-amber-400/15 dark:text-amber-400',
+                      )}
+                    >
+                      {seg.text}
+                    </span>
+                  );
+                }
+                if (seg.kind === 'pathvar') {
+                  return (
+                    <span
+                      key={seg.key}
+                      className="rounded-[3px] bg-violet-500/10 text-violet-600 dark:bg-violet-400/15 dark:text-violet-300"
+                    >
+                      {seg.text}
+                    </span>
+                  );
+                }
+                return <span key={seg.key}>{seg.text}</span>;
+              })
             )}
           </div>
         </div>
