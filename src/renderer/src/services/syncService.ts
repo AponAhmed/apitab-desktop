@@ -271,6 +271,28 @@ export async function shareCollectionToTeam(
   }
 }
 
+/**
+ * Unshares a collection: removes it from the team on the server (soft
+ * delete — every other assignee's next /sync reports it in
+ * deletedCollectionIds, same as a real delete) while keeping this device's
+ * copy, converted back into a personal (non-team) collection instead of
+ * being removed locally too.
+ */
+export async function unshareCollection(collectionId: string, teamId: string): Promise<void> {
+  await apiClient.unshareCollection(teamId, collectionId);
+  pushedVersions.delete(collectionId);
+  applyingRemote = true;
+  try {
+    useCollectionStore.setState((s) => ({
+      collections: s.collections.map((c) =>
+        c.id === collectionId ? { ...c, teamId: undefined, createdBy: undefined } : c,
+      ),
+    }));
+  } finally {
+    applyingRemote = false;
+  }
+}
+
 export async function runSyncTick(teamId: string): Promise<void> {
   useTeamStore.getState().setSyncing(true);
   try {

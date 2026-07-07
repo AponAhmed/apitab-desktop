@@ -11,6 +11,7 @@ import {
   Trash2,
   Upload,
   User,
+  UserMinus,
   Users,
 } from 'lucide-react';
 import { useCollectionStore } from '@/stores/collectionStore';
@@ -21,6 +22,7 @@ import { useAccountStore } from '@/stores/accountStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useDialogStore } from '@/stores/dialogStore';
 import { toast } from '@/stores/toastStore';
+import { unshareCollection } from '@/services/syncService';
 import { IconButton } from '@/components/ui/IconButton';
 import { Menu, type MenuItem } from '@/components/ui/Menu';
 import { MethodBadge } from '@/components/ui/Badge';
@@ -47,6 +49,7 @@ interface CollectionActions {
   duplicateRequest: (id: string) => void;
   deleteRequest: (req: ApiRequest) => void;
   shareToTeam: (collectionId: string) => void;
+  unshare: (container: Container) => void;
 }
 
 const ActionsContext = createContext<CollectionActions | null>(null);
@@ -128,6 +131,9 @@ function ContainerNode({
       : []),
     ...(canManageAccess
       ? [{ label: 'Manage access…', icon: Users, onClick: () => actions.shareToTeam(container.id) }]
+      : []),
+    ...(canManageAccess
+      ? [{ label: 'Unshare…', icon: UserMinus, onClick: () => actions.unshare(container) }]
       : []),
     {
       label: root ? 'Delete collection' : 'Delete folder',
@@ -291,6 +297,9 @@ export function CollectionsPanel() {
   const [deleteTarget, setDeleteTarget] = useState<
     { id: string; name: string; kind: 'container' | 'request' } | null
   >(null);
+  const [unshareTarget, setUnshareTarget] = useState<{ id: string; name: string; teamId: string } | null>(
+    null,
+  );
   const [personalRenameOpen, setPersonalRenameOpen] = useState(false);
 
   const fileRef = useRef<HTMLInputElement>(null);
@@ -321,6 +330,10 @@ export function CollectionsPanel() {
     rename: (c) => setRenameTarget({ id: c.id, name: c.name }),
     duplicate: (id) => duplicateContainer(id),
     removeContainer: (c) => setDeleteTarget({ id: c.id, name: c.name, kind: 'container' }),
+    unshare: (c) => {
+      const teamId = (c as Collection).teamId;
+      if (teamId) setUnshareTarget({ id: c.id, name: c.name, teamId });
+    },
     exportItem: (c) => {
       const activeEnv = environments.find((e) => e.id === activeEnvId);
       const sharedVars = (activeEnv?.variables ?? [])
@@ -553,6 +566,24 @@ export function CollectionsPanel() {
           else deleteContainer(deleteTarget.id);
         }}
         onClose={() => setDeleteTarget(null)}
+      />
+      <ConfirmDialog
+        open={!!unshareTarget}
+        title="Unshare"
+        confirmLabel="Unshare"
+        message={
+          <>
+            Unshare <b>{unshareTarget?.name || 'this collection'}</b>? Everyone else on the team
+            loses access, but it stays in your own workspace as a personal collection.
+          </>
+        }
+        onConfirm={() => {
+          if (!unshareTarget) return;
+          unshareCollection(unshareTarget.id, unshareTarget.teamId)
+            .then(() => toast.success(`"${unshareTarget.name}" is no longer shared`))
+            .catch(() => toast.error('Could not unshare this collection'));
+        }}
+        onClose={() => setUnshareTarget(null)}
       />
       <ShareToTeamDialog />
     </div>
