@@ -5,6 +5,7 @@ import { useCollectionStore } from '@/stores/collectionStore';
 import { useEnvironmentStore } from '@/stores/environmentStore';
 import { useTeamVariablesStore } from '@/stores/teamVariablesStore';
 import { usePendingAssignmentsStore } from '@/stores/pendingAssignmentsStore';
+import { useDialogStore } from '@/stores/dialogStore';
 import { toast } from '@/stores/toastStore';
 import type { Collection, Environment, TeamVariable } from '@/types';
 
@@ -331,7 +332,17 @@ export async function runAllTeamsSync(): Promise<void> {
   await useAccountStore.persist.rehydrate();
   await useTeamStore.persist.rehydrate();
 
-  if (!useAccountStore.getState().session) return;
+  const session = useAccountStore.getState().session;
+  if (!session) return;
+
+  // An unverified account is inactive server-side (every team/collection
+  // endpoint 403s) — surface the verification screen instead of spending a
+  // poll cycle on requests that can't succeed yet. Covers reopening the app
+  // with an already-unverified session, not just the register/login moment.
+  if (!session.user.emailVerified) {
+    useDialogStore.getState().openLogin();
+    return;
+  }
 
   // Refresh the team membership list itself before syncing each team's
   // collections/variables. Without this, being newly added to a team (or a

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDialogStore } from '@/stores/dialogStore';
 import { useAccountStore } from '@/stores/accountStore';
 import { useTeamStore } from '@/stores/teamStore';
@@ -9,19 +9,23 @@ import { Modal } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 
-type Mode = 'login' | 'register' | 'forgot' | 'reset';
+type Mode = 'login' | 'register' | 'forgot' | 'reset' | 'verify';
 
 const titles: Record<Mode, string> = {
   login: 'Log in',
   register: 'Create account',
   forgot: 'Reset password',
   reset: 'Enter reset code',
+  verify: 'Verify your email',
 };
 
 export function LoginDialog() {
   const open = useDialogStore((s) => s.loginOpen);
   const close = useDialogStore((s) => s.closeLogin);
+  const session = useAccountStore((s) => s.session);
   const setSession = useAccountStore((s) => s.setSession);
+  const updateUser = useAccountStore((s) => s.updateUser);
+  const clearSession = useAccountStore((s) => s.clearSession);
   const setTeams = useTeamStore((s) => s.setTeams);
 
   const [mode, setMode] = useState<Mode>('login');
@@ -31,8 +35,36 @@ export function LoginDialog() {
   const [token, setToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const cooldownTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => () => {
+    if (cooldownTimer.current) clearInterval(cooldownTimer.current);
+  }, []);
+
+  // Covers reopening the app (or the dialog store opening this dialog from
+  // syncService's startup check) with an already-unverified session, not
+  // just the moment right after register/login.
+  useEffect(() => {
+    if (open && session && !session.user.emailVerified) setMode('verify');
+  }, [open, session]);
+
+  const startResendCooldown = () => {
+    setResendCooldown(60);
+    if (cooldownTimer.current) clearInterval(cooldownTimer.current);
+    cooldownTimer.current = setInterval(() => {
+      setResendCooldown((s) => {
+        if (s <= 1) {
+          if (cooldownTimer.current) clearInterval(cooldownTimer.current);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  };
 
   const reset = () => {
     setMode('login');
@@ -42,11 +74,28 @@ export function LoginDialog() {
     setToken('');
     setNewPassword('');
     setConfirmPassword('');
+    setCode('');
     setError(null);
     setLoading(false);
   };
 
   const handleClose = () => {
+    // Unverified accounts can't do anything else in the app anyway — treat
+    // dismissing this screen as logging out, rather than leaving a
+    // logged-in-but-stuck session with no way back to this screen.
+    if (mode === 'verify') clearSession();
+    reset();
+    close();
+  };
+
+  const afterAuthenticated = async () => {
+    try {
+      const { teams } = await apiClient.fetchTeams();
+      setTeams(teams);
+      void runAllTeamsSync();
+    } catch {
+      // Non-fatal — teams can be loaded later from the team switcher.
+    }
     reset();
     close();
   };
@@ -61,17 +110,18 @@ export function LoginDialog() {
           : await apiClient.register(name, email, password);
 
       setSession(session);
-      toast.success(mode === 'login' ? 'Logged in' : 'Account created');
 
-      try {
-        const { teams } = await apiClient.fetchTeams();
-        setTeams(teams);
-        void runAllTeamsSync();
-      } catch {
-        // Non-fatal — teams can be loaded later from the team switcher.
+      if (!session.user.emailVerified) {
+        toast.success(
+          mode === 'login' ? 'Logged in' : 'Account created — check your email for a verification code',
+        );
+        setMode('verify');
+        setLoading(false);
+        return;
       }
 
-      handleClose();
+      toast.success(mode === 'login' ? 'Logged in' : 'Account created');
+      await afterAuthenticated();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong.');
     } finally {
@@ -111,15 +161,43 @@ export function LoginDialog() {
     }
   };
 
+  const submitVerify = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const { user } = await apiClient.verifyEmail(code);
+      updateUser(user);
+      toast.success('Email verified');
+      await afterAuthenticated();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendCode = async () => {
+    if (resendCooldown > 0) return;
+    try {
+      await apiClient.resendVerificationEmail();
+      toast.success('Verification code sent');
+      startResendCooldown();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not resend the code.');
+    }
+  };
+
   const submit = () => {
     if (mode === 'forgot') return submitForgotPassword();
     if (mode === 'reset') return submitResetPassword();
+    if (mode === 'verify') return submitVerify();
     return submitLoginOrRegister();
   };
 
   const canSubmit = (() => {
     if (loading) return false;
     if (mode === 'forgot') return email.trim() !== '';
+    if (mode === 'verify') return code.trim() !== '';
     if (mode === 'reset') {
       return (
         email.trim() !== '' &&
@@ -139,7 +217,9 @@ export function LoginDialog() {
         ? 'Create account'
         : mode === 'forgot'
           ? 'Send reset code'
-          : 'Reset password';
+          : mode === 'verify'
+            ? 'Verify'
+            : 'Reset password';
 
   return (
     <Modal
@@ -149,7 +229,7 @@ export function LoginDialog() {
       footer={
         <>
           <Button variant="ghost" onClick={handleClose}>
-            Cancel
+            {mode === 'verify' ? 'Log out' : 'Cancel'}
           </Button>
           <Button variant="primary" onClick={() => void submit()} disabled={!canSubmit}>
             {submitLabel}
@@ -173,18 +253,20 @@ export function LoginDialog() {
           </label>
         )}
 
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-            Email
-          </span>
-          <Input
-            type="email"
-            autoFocus={mode === 'login' || mode === 'forgot'}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            readOnly={mode === 'reset'}
-          />
-        </label>
+        {mode !== 'verify' && (
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+              Email
+            </span>
+            <Input
+              type="email"
+              autoFocus={mode === 'login' || mode === 'forgot'}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              readOnly={mode === 'reset'}
+            />
+          </label>
+        )}
 
         {(mode === 'login' || mode === 'register') && (
           <label className="block">
@@ -193,6 +275,29 @@ export function LoginDialog() {
             </span>
             <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
           </label>
+        )}
+
+        {mode === 'verify' && (
+          <>
+            <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+              Your account isn't active yet. Enter the verification code we emailed you to unlock
+              your workspace.
+            </p>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                Verification code
+              </span>
+              <Input autoFocus value={code} onChange={(e) => setCode(e.target.value)} />
+            </label>
+            <button
+              type="button"
+              onClick={() => void resendCode()}
+              disabled={resendCooldown > 0}
+              className="text-xs font-medium text-brand-600 hover:underline disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline dark:text-brand-400 dark:disabled:text-slate-500"
+            >
+              {resendCooldown > 0 ? `Resend code (${resendCooldown}s)` : "Didn't get a code? Resend"}
+            </button>
+          </>
         )}
 
         {mode === 'reset' && (

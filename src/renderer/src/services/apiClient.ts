@@ -2,6 +2,7 @@ import { API_BASE_URL, API_KEY } from '@/config/server';
 import { useAccountStore } from '@/stores/accountStore';
 import type {
   AuthSession,
+  AuthUser,
   Collection,
   CollectionAssigneeStatus,
   PendingAssignment,
@@ -107,6 +108,11 @@ export const apiClient = {
       password,
       password_confirmation: passwordConfirmation,
     }),
+
+  verifyEmail: (code: string) =>
+    request<{ message: string; user: AuthUser }>('POST', '/email/verify', { code }),
+
+  resendVerificationEmail: () => request<{ message: string }>('POST', '/email/resend'),
 
   me: () => request<{ user: AuthSession['user']; teams: Pick<Team, 'id' | 'name' | 'role'>[] }>('GET', '/me'),
 
