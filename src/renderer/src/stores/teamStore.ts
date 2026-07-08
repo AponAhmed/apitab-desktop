@@ -14,6 +14,7 @@ interface TeamState {
 
   setTeams: (teams: Team[]) => void;
   setActiveTeam: (id: string | null) => void;
+  renameTeamInStore: (teamId: string, name: string) => void;
   setMembers: (teamId: string, members: TeamMember[]) => void;
   addMemberToStore: (teamId: string, member: TeamMember) => void;
   removeMemberFromStore: (teamId: string, userId: string) => void;
@@ -36,11 +37,17 @@ export const useTeamStore = create<TeamState>()(
       setTeams: (teams) =>
         set((s) => ({
           teams,
-          activeTeamId: s.activeTeamId && teams.some((t) => t.id === s.activeTeamId)
-            ? s.activeTeamId
-            : (teams[0]?.id ?? null),
+          // Preserve whatever workspace was active (including "Personal",
+          // i.e. null) if it's still valid; otherwise fall back to Personal
+          // rather than an arbitrary first team — the active workspace also
+          // drives which collections the sidebar shows, so jumping to
+          // teams[0] here used to hijack the user's own selection on every
+          // team-list refresh.
+          activeTeamId: s.activeTeamId && teams.some((t) => t.id === s.activeTeamId) ? s.activeTeamId : null,
         })),
       setActiveTeam: (activeTeamId) => set({ activeTeamId }),
+      renameTeamInStore: (teamId, name) =>
+        set((s) => ({ teams: s.teams.map((t) => (t.id === teamId ? { ...t, name } : t)) })),
       setMembers: (teamId, teamMembers) =>
         set((s) => ({ members: { ...s.members, [teamId]: teamMembers } })),
       addMemberToStore: (teamId, member) =>

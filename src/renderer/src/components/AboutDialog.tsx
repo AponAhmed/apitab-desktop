@@ -120,8 +120,8 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
   }, []);
 
   return (
-    <Modal open={open} onClose={onClose} title="About" className="max-w-sm">
-      <div className="space-y-4">
+    <Modal open={open} onClose={onClose} title="About" className="max-w-lg">
+      <div className="max-h-[75vh] space-y-4 overflow-y-auto pr-1">
         <div className="flex items-center gap-3">
           <Logo className="h-11 w-11" />
           <div className="min-w-0">

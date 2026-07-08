@@ -35,8 +35,12 @@ export function Modal({ open, onClose, title, children, footer, className }: Mod
         aria-modal="true"
         onMouseDown={(e) => e.stopPropagation()}
         className={cn(
-          'w-full max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900',
-          className,
+          'w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900',
+          // `cn` is a plain joiner (no Tailwind conflict resolution), so a
+          // competing `max-w-*` here would silently win over a caller's
+          // override depending on generated CSS order — fall back instead
+          // of always including the default, so exactly one is ever present.
+          className ?? 'max-w-md',
         )}
       >
         {title != null && (

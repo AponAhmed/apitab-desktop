@@ -121,10 +121,17 @@ export const apiClient = {
   createTeam: (name: string) => request<Team>('POST', '/teams', { name }),
 
   fetchTeamDetail: (teamId: string) =>
-    request<{ id: string; name: string; ownerId: string; members: TeamMember[] }>(
-      'GET',
-      `/teams/${teamId}`,
-    ),
+    request<{
+      id: string;
+      name: string;
+      ownerId: string;
+      createdAt?: number;
+      collectionsCount: number;
+      members: TeamMember[];
+    }>('GET', `/teams/${teamId}`),
+
+  updateTeam: (teamId: string, name: string) =>
+    request<{ id: string; name: string; ownerId: string }>('PUT', `/teams/${teamId}`, { name }),
 
   fetchTeamCollections: (teamId: string) =>
     request<{ collections: Collection[] }>('GET', `/teams/${teamId}/collections`),

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { MoreVertical, type LucideIcon } from 'lucide-react';
 import { IconButton } from './IconButton';
 import { cn } from '@/utils/cn';
+import { computePopoverPosition } from '@/utils/popoverPosition';
 
 export interface MenuItem {
   label: string;
@@ -27,10 +28,8 @@ export function Menu({ items, label = 'Actions' }: MenuProps) {
   const toggle = (e: ReactMouseEvent) => {
     e.stopPropagation();
     const r = btnRef.current!.getBoundingClientRect();
-    setPos({
-      x: Math.max(8, Math.min(r.left, window.innerWidth - WIDTH - 8)),
-      y: r.bottom + 4,
-    });
+    const estimatedHeight = items.length * 32 + items.filter((i) => i.separatorBefore).length * 9 + 8;
+    setPos(computePopoverPosition(r, { width: WIDTH, height: estimatedHeight }));
     setOpen((o) => !o);
   };
 
