@@ -121,6 +121,12 @@ function normalizeForEditing(req: ApiRequest): ApiRequest {
     body: {
       ...base.body,
       ...req.body,
+      // Explicit fallbacks (not just the spread above) so an explicit
+      // `null` surviving from corrupted/imported/synced data is coerced
+      // back to a safe string instead of overriding the default and
+      // crashing JsonBody/RawBody, which call `.trim()` unconditionally.
+      json: req.body?.json ?? '',
+      raw: req.body?.raw ?? '',
       formUrlEncoded: withTrailingRow(req.body?.formUrlEncoded ?? []),
       formData: withTrailingRow(req.body?.formData ?? []),
     },

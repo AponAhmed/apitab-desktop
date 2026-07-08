@@ -80,6 +80,10 @@ export function ShareToTeamDialog() {
       } else {
         await shareCollectionToTeam(collectionId, effectiveTeamId, [...selected]);
         toast.success(`Shared "${collection?.name}" with the team`);
+        // The collection now lives in effectiveTeamId — switch the active
+        // workspace there so it doesn't vanish from the sidebar's
+        // active-workspace-only filter right after sharing it.
+        useTeamStore.getState().setActiveTeam(effectiveTeamId);
       }
       close();
     } catch {

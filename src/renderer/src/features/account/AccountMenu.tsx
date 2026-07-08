@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, LogIn, RefreshCw, UserPlus, Users, LogOut, Settings as SettingsIcon, UsersRound, Monitor, Sun, Moon } from 'lucide-react';
+import { ChevronDown, LogIn, RefreshCw, UserPlus, Users, LogOut, Settings as SettingsIcon, UsersRound } from 'lucide-react';
 import { useAccountStore } from '@/stores/accountStore';
 import { useTeamStore } from '@/stores/teamStore';
 import { useTeamVariablesStore } from '@/stores/teamVariablesStore';
@@ -23,6 +23,7 @@ export function TeamSelector() {
   const activeTeamId = useTeamStore((s) => s.activeTeamId);
   const setActiveTeam = useTeamStore((s) => s.setActiveTeam);
   const setTeams = useTeamStore((s) => s.setTeams);
+  const personalWorkspaceName = useSettingsStore((s) => s.personalWorkspaceName);
   const [createOpen, setCreateOpen] = useState(false);
 
   const createTeam = async (name: string) => {
@@ -38,30 +39,27 @@ export function TeamSelector() {
 
   return (
     <>
-      <div className="flex items-center gap-1.5" title="Active workspace">
+      {/* This also drives which workspace's collections the sidebar shows —
+          not just a display label. */}
+      <div className="flex items-center gap-1.5" title="Current workspace">
         <Users className="h-4 w-4 shrink-0 text-slate-400" />
-        {teams.length > 0 ? (
-          <Select
-            value={activeTeamId ?? ''}
-            onChange={(e) => {
-              if (e.target.value === NEW_TEAM) setCreateOpen(true);
-              else setActiveTeam(e.target.value || null);
-            }}
-            className="h-8 w-32 text-xs border-transparent bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 focus:bg-slate-100 dark:focus:bg-slate-800 shadow-none focus:ring-0"
-            aria-label="Active team"
-          >
-            {teams.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-            <option value={NEW_TEAM}>+ New workspace…</option>
-          </Select>
-        ) : (
-          <IconButton size="sm" title="Create a workspace" aria-label="Create a workspace" onClick={() => setCreateOpen(true)}>
-            <UserPlus className="h-3.5 w-3.5" />
-          </IconButton>
-        )}
+        <Select
+          value={activeTeamId ?? ''}
+          onChange={(e) => {
+            if (e.target.value === NEW_TEAM) setCreateOpen(true);
+            else setActiveTeam(e.target.value || null);
+          }}
+          className="h-8 w-32 text-xs border-transparent bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 focus:bg-slate-100 dark:focus:bg-slate-800 shadow-none focus:ring-0"
+          aria-label="Current workspace"
+        >
+          <option value="">{personalWorkspaceName}</option>
+          {teams.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+          <option value={NEW_TEAM}>+ New workspace…</option>
+        </Select>
       </div>
 
       <PromptDialog
@@ -107,9 +105,6 @@ export function AccountAvatar() {
   const [manageOpen, setManageOpen] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
-  // Every hook must run unconditionally on every render — the `!session`
-  // early return below must come after all hook calls, not before.
-  const theme = useSettingsStore((s) => s.theme);
 
   if (!session) {
     return (
@@ -137,9 +132,6 @@ export function AccountAvatar() {
     setOpen((o) => !o);
   };
 
-  const ICONS = { light: Sun, dark: Moon, system: Monitor } as const;
-  const ThemeIcon = ICONS[theme];
-
   const initial = session.user.name ? session.user.name.charAt(0).toUpperCase() : 'U';
 
   return (
@@ -147,7 +139,7 @@ export function AccountAvatar() {
       <button
         ref={btnRef}
         onClick={toggle}
-        className="ml-1 flex items-center gap-1.5 rounded-full py-1 pl-1 pr-1.5 text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
+        className="flex items-center gap-1.5 rounded-full py-1 pl-1 pr-1.5 text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
         aria-label="Account menu"
       >
         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500 text-xs font-semibold text-white">
@@ -187,7 +179,7 @@ export function AccountAvatar() {
                       setManageOpen(true);
                     }}
                   >
-                    <UsersRound className="h-4 w-4" /> Manage team
+                    <UsersRound className="h-4 w-4" /> Manage workspace
                   </button>
                 )}
                 <button
@@ -198,17 +190,6 @@ export function AccountAvatar() {
                   }}
                 >
                   <SettingsIcon className="h-4 w-4" /> Account settings
-                </button>
-                <button
-                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800/60 transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const ORDER = ['light', 'dark', 'system'] as const;
-                    const next = ORDER[(ORDER.indexOf(theme) + 1) % ORDER.length];
-                    useSettingsStore.getState().setTheme(next);
-                  }}
-                >
-                  <ThemeIcon className="h-4 w-4" /> Appearance: <span className="capitalize">{theme}</span>
                 </button>
               </div>
               

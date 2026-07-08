@@ -22,6 +22,8 @@ function sanitizeApiRequest(req: ApiRequest): ApiRequest {
     headers: sanitizeRows(req.headers),
     body: {
       ...req.body,
+      json: req.body?.json ?? '',
+      raw: req.body?.raw ?? '',
       formUrlEncoded: sanitizeRows(req.body?.formUrlEncoded),
       formData: sanitizeRows(req.body?.formData),
     },

@@ -19,17 +19,22 @@ export function ManageTeamDialog({ open, onClose }: { open: boolean; onClose: ()
   const setMembers = useTeamStore((s) => s.setMembers);
   const addMemberToStore = useTeamStore((s) => s.addMemberToStore);
   const removeMemberFromStore = useTeamStore((s) => s.removeMemberFromStore);
+  const renameTeamInStore = useTeamStore((s) => s.renameTeamInStore);
   const currentUserId = useAccountStore((s) => s.session?.user.id ?? null);
 
   const team = teams.find((t) => t.id === activeTeamId);
   const members = activeTeamId ? (membersRecord[activeTeamId] ?? []) : [];
   const myRole = members.find((m) => m.userId === currentUserId)?.role;
+  const canRename = myRole === 'owner' || myRole === 'admin';
 
   const [loading, setLoading] = useState(false);
   const [membersLoading, setMembersLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Extract<TeamRole, 'admin' | 'member'>>('member');
   const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
+  const [nameDraft, setNameDraft] = useState('');
+  const [renaming, setRenaming] = useState(false);
+  const [summary, setSummary] = useState<{ createdAt?: number; collectionsCount: number } | null>(null);
 
   /** Mirrors TeamPolicy::removeMember server-side: never the owner; owner removes anyone else; admin removes plain members only. */
   const canRemove = (m: TeamMember) =>
@@ -46,16 +51,39 @@ export function ManageTeamDialog({ open, onClose }: { open: boolean; onClose: ()
     }
   };
 
-  // Load members when the dialog opens.
+  // Load members + summary when the dialog opens.
   useEffect(() => {
     if (!open || !activeTeamId) return;
     setMembersLoading(true);
     apiClient
       .fetchTeamDetail(activeTeamId)
-      .then((detail) => setMembers(activeTeamId, detail.members))
+      .then((detail) => {
+        setMembers(activeTeamId, detail.members);
+        setSummary({ createdAt: detail.createdAt, collectionsCount: detail.collectionsCount });
+      })
       .catch(() => toast.error('Failed to load team members'))
       .finally(() => setMembersLoading(false));
   }, [open, activeTeamId, setMembers]);
+
+  useEffect(() => {
+    if (team) setNameDraft(team.name);
+  }, [team?.id, team?.name]);
+
+  const handleRename = async (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = nameDraft.trim();
+    if (!activeTeamId || !trimmed || trimmed === team?.name) return;
+    setRenaming(true);
+    try {
+      const updated = await apiClient.updateTeam(activeTeamId, trimmed);
+      renameTeamInStore(activeTeamId, updated.name);
+      toast.success('Workspace renamed');
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to rename workspace');
+    } finally {
+      setRenaming(false);
+    }
+  };
 
   const handleAddMember = async (e: FormEvent) => {
     e.preventDefault();
@@ -78,8 +106,48 @@ export function ManageTeamDialog({ open, onClose }: { open: boolean; onClose: ()
   if (!team) return null;
 
   return (
-    <Modal open={open} onClose={onClose} title={`Manage Team: ${team.name}`} className="max-w-md">
+    <Modal open={open} onClose={onClose} title="Manage Workspace" className="max-w-md">
       <div className="space-y-4">
+        <div>
+          <h4 className="mb-2 text-sm font-medium text-slate-900 dark:text-slate-100">
+            Workspace name
+          </h4>
+          {canRename ? (
+            <form onSubmit={(e) => void handleRename(e)} className="flex gap-2">
+              <Input
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                className="flex-1"
+                required
+              />
+              <Button type="submit" disabled={renaming || !nameDraft.trim() || nameDraft.trim() === team.name}>
+                {renaming ? 'Saving…' : 'Save'}
+              </Button>
+            </form>
+          ) : (
+            <p className="text-sm text-slate-700 dark:text-slate-300">{team.name}</p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-3 divide-x divide-slate-200 rounded-md border border-slate-200 text-center dark:divide-slate-800 dark:border-slate-800">
+          <div className="px-2 py-2.5">
+            <p className="text-base font-semibold text-slate-900 dark:text-slate-100">{members.length}</p>
+            <p className="text-[11px] text-slate-400">Members</p>
+          </div>
+          <div className="px-2 py-2.5">
+            <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              {summary?.collectionsCount ?? '—'}
+            </p>
+            <p className="text-[11px] text-slate-400">Collections</p>
+          </div>
+          <div className="px-2 py-2.5">
+            <p className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              {summary?.createdAt ? new Date(summary.createdAt).toLocaleDateString() : '—'}
+            </p>
+            <p className="text-[11px] text-slate-400">Created</p>
+          </div>
+        </div>
+
         <div>
           <h4 className="mb-2 text-sm font-medium text-slate-900 dark:text-slate-100">
             Invite new member

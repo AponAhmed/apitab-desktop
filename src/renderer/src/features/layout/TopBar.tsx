@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Info, PanelLeft, Settings } from 'lucide-react';
+import { Info, Monitor, Moon, PanelLeft, Settings, Sun } from 'lucide-react';
 import { useUiStore } from '@/stores/uiStore';
 import { useDialogStore } from '@/stores/dialogStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { IconButton } from '@/components/ui/IconButton';
 import { Logo } from '@/components/Logo';
 import { AboutDialog } from '@/components/AboutDialog';
@@ -12,7 +13,28 @@ import { PendingAssignmentsBell } from '@/components/PendingAssignmentsBell';
 
 /** Shared "clustered & bordered" pill styling for the context/utility control groups. */
 const CLUSTER =
-  'flex items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-1 dark:border-slate-800 dark:bg-white/[0.04]';
+  'flex items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 px-1 py-0.5 dark:border-slate-800 dark:bg-white/[0.04]';
+
+const THEME_ICONS = { light: Sun, dark: Moon, system: Monitor } as const;
+const THEME_ORDER = ['light', 'dark', 'system'] as const;
+
+function ThemeToggle() {
+  const theme = useSettingsStore((s) => s.theme);
+  const Icon = THEME_ICONS[theme];
+  return (
+    <IconButton
+      size="sm"
+      title={`Theme: ${theme} (click to change)`}
+      aria-label={`Theme: ${theme}`}
+      onClick={() => {
+        const next = THEME_ORDER[(THEME_ORDER.indexOf(theme) + 1) % THEME_ORDER.length];
+        useSettingsStore.getState().setTheme(next);
+      }}
+    >
+      <Icon className="h-4 w-4" />
+    </IconButton>
+  );
+}
 
 export function TopBar() {
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
@@ -20,12 +42,12 @@ export function TopBar() {
   const [aboutOpen, setAboutOpen] = useState(false);
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-3 dark:border-slate-800 dark:bg-[#0f111a]">
-      <IconButton title="Toggle sidebar" aria-label="Toggle sidebar" onClick={toggleSidebar}>
+    <header className="flex h-11 shrink-0 items-center gap-1.5 border-b border-slate-200 bg-white px-2.5 dark:border-slate-800 dark:bg-[#0f111a]">
+      <IconButton size="sm" title="Toggle sidebar" aria-label="Toggle sidebar" onClick={toggleSidebar}>
         <PanelLeft className="h-4 w-4" />
       </IconButton>
 
-      <div className="ml-1 flex items-center gap-2 text-brand-500">
+      <div className="flex items-center gap-1.5 text-brand-500">
         <Logo className="h-5 w-5" />
         <span className="text-sm font-semibold tracking-wide text-slate-900 dark:text-slate-100">
           ApiTab
@@ -34,7 +56,7 @@ export function TopBar() {
 
       <div className="flex-1" />
 
-      <div className="mr-2 flex items-center gap-2">
+      <div className="mr-1.5 flex items-center gap-1.5">
         {/* Context: what you're working in. */}
         <div className={CLUSTER}>
           <EnvironmentSelector />
@@ -46,6 +68,7 @@ export function TopBar() {
         <div className={CLUSTER}>
           <SyncButton />
           <PendingAssignmentsBell />
+          <ThemeToggle />
           <IconButton size="sm" title="About" aria-label="About ApiTab" onClick={() => setAboutOpen(true)}>
             <Info className="h-4 w-4" />
           </IconButton>

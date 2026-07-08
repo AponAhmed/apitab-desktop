@@ -20,6 +20,7 @@ import { useEnvironmentStore } from '@/stores/environmentStore';
 import { useTeamStore } from '@/stores/teamStore';
 import { useAccountStore } from '@/stores/accountStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useUiStore } from '@/stores/uiStore';
 import { useDialogStore } from '@/stores/dialogStore';
 import { toast } from '@/stores/toastStore';
 import { unshareCollection } from '@/services/syncService';
@@ -79,7 +80,7 @@ function RequestNode({
       style={{ paddingLeft: depth * INDENT + 6 }}
       className={cn(
         'group flex cursor-pointer items-center gap-1.5 rounded-md py-0.5 pr-1 hover:bg-slate-100 dark:hover:bg-slate-800/70',
-        active && 'bg-brand-50 dark:bg-brand-950/40',
+        active && 'bg-brand-100 dark:bg-brand-900/40',
       )}
     >
       <span className="w-9 shrink-0 text-right">
@@ -279,6 +280,8 @@ export function CollectionsPanel() {
   const activeRequestId = useRequestStore((s) => s.savedRef?.requestId ?? null);
   const openShareToTeam = useDialogStore((s) => s.openShareToTeam);
   const teams = useTeamStore((s) => s.teams);
+  const activeTeamId = useTeamStore((s) => s.activeTeamId);
+  const setActiveTeam = useTeamStore((s) => s.setActiveTeam);
   const currentUserId = useAccountStore((s) => s.session?.user.id ?? null);
   const personalWorkspaceName = useSettingsStore((s) => s.personalWorkspaceName);
   const setPersonalWorkspaceName = useSettingsStore((s) => s.setPersonalWorkspaceName);
@@ -289,8 +292,10 @@ export function CollectionsPanel() {
   const setActiveEnvironment = useEnvironmentStore((s) => s.setActiveEnvironment);
   const upsertVariable = useEnvironmentStore((s) => s.upsertVariable);
 
+  const collapsed = useUiStore((s) => s.collapsedContainers);
+  const toggleContainerCollapsed = useUiStore((s) => s.toggleContainerCollapsed);
+
   const [search, setSearch] = useState('');
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [createOpen, setCreateOpen] = useState(false);
   const [folderParent, setFolderParent] = useState<string | null>(null);
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
@@ -305,7 +310,7 @@ export function CollectionsPanel() {
   const fileRef = useRef<HTMLInputElement>(null);
   const importTarget = useRef<string | null>(null);
 
-  const toggle = (id: string) => setCollapsed((m) => ({ ...m, [id]: !m[id] }));
+  const toggle = (id: string) => toggleContainerCollapsed(id);
 
   const q = search.trim().toLowerCase();
   const visible = useMemo(
@@ -321,6 +326,16 @@ export function CollectionsPanel() {
   const groups = useMemo(
     () => groupByWorkspace(visible, teams, personalWorkspaceName, currentUserId),
     [visible, teams, personalWorkspaceName, currentUserId],
+  );
+
+  // Only the current workspace's own section shows — "orphaned" (a
+  // collection whose team this device no longer recognizes) stays visible
+  // regardless, since it doesn't belong to any selectable workspace and
+  // hiding it further would make that data seem to vanish.
+  const activeWorkspaceKey = activeTeamId ?? 'personal';
+  const visibleGroups = useMemo(
+    () => groups.filter((g) => g.key === 'orphaned' || g.key === activeWorkspaceKey),
+    [groups, activeWorkspaceKey],
   );
 
   const actions: CollectionActions = {
@@ -358,7 +373,12 @@ export function CollectionsPanel() {
   const importCollectionExport = (data: NonNullable<ReturnType<typeof parseCollectionExport>['data']>) => {
     const target = importTarget.current;
     if (target) importIntoContainer(target, data);
-    else importAsCollection(data);
+    else {
+      importAsCollection(data);
+      // New imports always land in the personal workspace — switch there so
+      // the result isn't immediately hidden by the active-workspace filter.
+      if (activeTeamId !== null) setActiveTeam(null);
+    }
 
     const sharedVars = data.environmentVariables;
     if (sharedVars?.length) {
@@ -433,7 +453,7 @@ export function CollectionsPanel() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-1 pb-2">
-        {visible.length === 0 ? (
+        {visibleGroups.length === 0 ? (
           <EmptyState
             icon={Folder}
             title={q ? 'No matches' : 'No collections'}
@@ -441,7 +461,7 @@ export function CollectionsPanel() {
           />
         ) : (
           <ActionsContext.Provider value={actions}>
-            {groups.map((group) => (
+            {visibleGroups.map((group) => (
               <div key={group.key} className="mb-3">
                 <div
                   className={cn(
@@ -479,10 +499,7 @@ export function CollectionsPanel() {
                   )}
                 </div>
                 <div
-                  className={cn(
-                    group.isTeam &&
-                      'rounded-md border-l-2 border-brand-200 bg-brand-50/40 dark:border-brand-900 dark:bg-brand-950/10',
-                  )}
+                  className={cn(group.isTeam && 'rounded-md border-l border-brand-200 dark:border-brand-900')}
                 >
                   {group.collections.map((c) => (
                     <ContainerNode
@@ -520,7 +537,12 @@ export function CollectionsPanel() {
         label="Collection name"
         placeholder="My Collection"
         confirmLabel="Create"
-        onConfirm={(v) => createCollection(v)}
+        onConfirm={(v) => {
+          createCollection(v);
+          // New collections always land in the personal workspace — switch
+          // there so it isn't immediately hidden by the active-workspace filter.
+          if (activeTeamId !== null) setActiveTeam(null);
+        }}
         onClose={() => setCreateOpen(false)}
       />
       <PromptDialog
@@ -580,7 +602,12 @@ export function CollectionsPanel() {
         onConfirm={() => {
           if (!unshareTarget) return;
           unshareCollection(unshareTarget.id, unshareTarget.teamId)
-            .then(() => toast.success(`"${unshareTarget.name}" is no longer shared`))
+            .then(() => {
+              toast.success(`"${unshareTarget.name}" is no longer shared`);
+              // It's personal again now — follow it there so it doesn't
+              // vanish from the sidebar's active-workspace-only filter.
+              setActiveTeam(null);
+            })
             .catch(() => toast.error('Could not unshare this collection'));
         }}
         onClose={() => setUnshareTarget(null)}
