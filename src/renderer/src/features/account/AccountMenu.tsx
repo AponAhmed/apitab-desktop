@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { LogIn, RefreshCw, UserPlus, Users, LogOut, Settings as SettingsIcon, UsersRound, Monitor, Sun, Moon } from 'lucide-react';
+import { ChevronDown, LogIn, RefreshCw, UserPlus, Users, LogOut, Settings as SettingsIcon, UsersRound, Monitor, Sun, Moon } from 'lucide-react';
 import { useAccountStore } from '@/stores/accountStore';
 import { useTeamStore } from '@/stores/teamStore';
 import { useTeamVariablesStore } from '@/stores/teamVariablesStore';
@@ -147,10 +147,14 @@ export function AccountAvatar() {
       <button
         ref={btnRef}
         onClick={toggle}
-        className="ml-1 flex h-7 w-7 items-center justify-center rounded-full bg-brand-500 text-xs font-semibold text-white shadow-sm hover:bg-brand-600 transition-colors"
+        className="ml-1 flex items-center gap-1.5 rounded-full py-1 pl-1 pr-1.5 text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
         aria-label="Account menu"
       >
-        {initial}
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500 text-xs font-semibold text-white">
+          {initial}
+        </span>
+        <span className="max-w-[7rem] truncate text-xs font-medium">{session.user.name}</span>
+        <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform', open && 'rotate-180')} />
       </button>
 
       {open &&
