@@ -10,6 +10,10 @@ import { TeamSelector, SyncButton, AccountAvatar } from '@/features/account/Acco
 import { LoginDialog } from '@/features/account/LoginDialog';
 import { PendingAssignmentsBell } from '@/components/PendingAssignmentsBell';
 
+/** Shared "clustered & bordered" pill styling for the context/utility control groups. */
+const CLUSTER =
+  'flex items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-1 dark:border-slate-800 dark:bg-white/[0.04]';
+
 export function TopBar() {
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const openSettings = useDialogStore((s) => s.openSettings);
@@ -30,23 +34,28 @@ export function TopBar() {
 
       <div className="flex-1" />
 
-      <div className="mr-2 flex items-center gap-1.5">
-        <EnvironmentSelector />
-        <div className="mx-1.5 h-4 w-px bg-slate-200 dark:bg-slate-700" />
-        <TeamSelector />
-        <SyncButton />
-        <PendingAssignmentsBell />
+      <div className="mr-2 flex items-center gap-2">
+        {/* Context: what you're working in. */}
+        <div className={CLUSTER}>
+          <EnvironmentSelector />
+          <div className="mx-0.5 h-4 w-px bg-slate-200 dark:bg-slate-700" />
+          <TeamSelector />
+        </div>
+
+        {/* Utilities: sync, notifications, app-level actions. */}
+        <div className={CLUSTER}>
+          <SyncButton />
+          <PendingAssignmentsBell />
+          <IconButton size="sm" title="About" aria-label="About ApiTab" onClick={() => setAboutOpen(true)}>
+            <Info className="h-4 w-4" />
+          </IconButton>
+          <IconButton size="sm" title="Settings" aria-label="Open settings" onClick={openSettings}>
+            <Settings className="h-4 w-4" />
+          </IconButton>
+        </div>
       </div>
 
-      <div className="flex items-center gap-0.5">
-        <IconButton title="About" aria-label="About ApiTab" onClick={() => setAboutOpen(true)}>
-          <Info className="h-4 w-4" />
-        </IconButton>
-        <IconButton title="Settings" aria-label="Open settings" onClick={openSettings}>
-          <Settings className="h-4 w-4" />
-        </IconButton>
-        <AccountAvatar />
-      </div>
+      <AccountAvatar />
 
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <LoginDialog />
