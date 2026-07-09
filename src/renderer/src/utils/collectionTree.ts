@@ -12,7 +12,13 @@ export function newFolder(name: string): CollectionFolder {
 
 /** Coerces possibly-corrupted (e.g. null from legacy/synced data) fields to safe strings. */
 function sanitizeRows(rows: KeyValue[] | undefined): KeyValue[] {
-  return (rows ?? []).map((r) => ({ ...r, key: r.key ?? '', value: r.value ?? '', enabled: r.enabled ?? true }));
+  return (rows ?? []).map((r) => ({
+    ...r,
+    key: r.key ?? '',
+    value: r.value ?? '',
+    enabled: r.enabled ?? true,
+    description: r.description ?? '',
+  }));
 }
 
 function sanitizeApiRequest(req: ApiRequest): ApiRequest {

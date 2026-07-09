@@ -55,7 +55,13 @@ function applyEnvUpdates(
 
 /** Coerces possibly-corrupted (e.g. null from legacy/synced data) fields to safe strings. */
 function sanitizeKeyValue(kv: KeyValue): KeyValue {
-  return { ...kv, key: kv.key ?? '', value: kv.value ?? '', enabled: kv.enabled ?? true };
+  return {
+    ...kv,
+    key: kv.key ?? '',
+    value: kv.value ?? '',
+    enabled: kv.enabled ?? true,
+    description: kv.description ?? '',
+  };
 }
 
 /** Ensures a key/value list always ends with one blank row for quick entry. */

@@ -20,6 +20,7 @@ export function ParamsTab() {
           onRemove={removeParam}
           keyPlaceholder="Parameter"
           valuePlaceholder="Value"
+          showNotes
         />
       </div>
 
@@ -37,6 +38,7 @@ export function ParamsTab() {
             valuePlaceholder="Value"
             readOnlyKeys
             hideRemove
+            showNotes
           />
         </div>
       )}

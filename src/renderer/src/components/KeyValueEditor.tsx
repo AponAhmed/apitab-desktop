@@ -30,6 +30,8 @@ interface KeyValueEditorProps {
   readOnlyKeys?: boolean;
   /** Hides the per-row remove button/column, for rows that can't be deleted individually. */
   hideRemove?: boolean;
+  /** Adds a free-text "Description" column per row (Params, Headers, form bodies) — not sent with the request. */
+  showNotes?: boolean;
 }
 
 const inputClass =
@@ -164,14 +166,28 @@ export function KeyValueEditor({
   onToggleShared,
   readOnlyKeys = false,
   hideRemove = false,
+  showNotes = false,
 }: KeyValueEditorProps) {
   const keyListId = useId();
   const valueListId = useId();
   const shareCol = showShareToggle ? ' 2rem' : '';
   const removeCol = hideRemove ? '' : ' 2.25rem';
+  const notesCol = showNotes ? ' 1fr' : '';
+  const gridTemplateColumns = `2.25rem ${columnRatio[0]} ${columnRatio[1]}${notesCol}${shareCol}${removeCol}`;
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
+      {showNotes && (
+        <div
+          style={{ gridTemplateColumns }}
+          className="grid items-center border-b border-slate-200 bg-slate-50 py-1 text-[11px] font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400"
+        >
+          <span />
+          <span className="px-2">{keyPlaceholder}</span>
+          <span className="px-2 border-l border-slate-200 dark:border-slate-800">{valuePlaceholder}</span>
+          <span className="px-2 border-l border-slate-200 dark:border-slate-800">Description</span>
+        </div>
+      )}
       {keySuggestions && (
         <datalist id={keyListId}>
           {keySuggestions.map((s) => (
@@ -193,9 +209,7 @@ export function KeyValueEditor({
         return (
           <div
             key={row.id}
-            style={{
-              gridTemplateColumns: `2.25rem ${columnRatio[0]} ${columnRatio[1]}${shareCol}${removeCol}`,
-            }}
+            style={{ gridTemplateColumns }}
             className={cn(
               'grid items-center',
               i > 0 && 'border-t border-slate-200 dark:border-slate-800',
@@ -236,6 +250,20 @@ export function KeyValueEditor({
               dim={dim}
               enableVariables={enableVariables}
             />
+            {showNotes && (
+              <input
+                value={row.description ?? ''}
+                placeholder="Description"
+                spellCheck={false}
+                autoComplete="off"
+                onChange={(e) => onChange(row.id, { description: e.target.value })}
+                className={cn(
+                  inputClass,
+                  'border-l border-slate-200 dark:border-slate-800',
+                  dim && 'opacity-50',
+                )}
+              />
+            )}
             {showShareToggle && (
               <div className="grid place-items-center">
                 {!isTrailing && (

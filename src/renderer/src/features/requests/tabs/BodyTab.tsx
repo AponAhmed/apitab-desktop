@@ -72,14 +72,14 @@ function FormUrlEncodedBody() {
   const rows = useRequestStore((s) => s.request.body.formUrlEncoded);
   const update = useRequestStore((s) => s.updateFormUrlEncoded);
   const remove = useRequestStore((s) => s.removeFormUrlEncoded);
-  return <KeyValueEditor rows={rows} onChange={update} onRemove={remove} keyPlaceholder="Field" />;
+  return <KeyValueEditor rows={rows} onChange={update} onRemove={remove} keyPlaceholder="Field" showNotes />;
 }
 
 function FormDataBody() {
   const rows = useRequestStore((s) => s.request.body.formData);
   const update = useRequestStore((s) => s.updateFormData);
   const remove = useRequestStore((s) => s.removeFormData);
-  return <KeyValueEditor rows={rows} onChange={update} onRemove={remove} keyPlaceholder="Field" />;
+  return <KeyValueEditor rows={rows} onChange={update} onRemove={remove} keyPlaceholder="Field" showNotes />;
 }
 
 export function BodyTab() {

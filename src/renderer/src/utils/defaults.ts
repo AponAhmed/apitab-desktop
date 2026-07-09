@@ -9,7 +9,7 @@ import type {
 
 /** A blank, enabled key/value row. */
 export function emptyKeyValue(init: Partial<KeyValue> = {}): KeyValue {
-  return { id: uuid(), key: '', value: '', enabled: true, ...init };
+  return { id: uuid(), key: '', value: '', enabled: true, description: '', ...init };
 }
 
 export function defaultAuth(): AuthConfig {
