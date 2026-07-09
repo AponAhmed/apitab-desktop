@@ -17,6 +17,7 @@ export function HeadersTab() {
         valuePlaceholder="Value"
         keySuggestions={COMMON_HEADERS}
         valueSuggestions={COMMON_CONTENT_TYPES}
+        showNotes
       />
     </div>
   );

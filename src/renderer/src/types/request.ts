@@ -27,6 +27,8 @@ export interface KeyValue {
   key: string;
   value: string;
   enabled: boolean;
+  /** Free-text note — not sent with the request, purely documentation for the row. */
+  description?: string;
 }
 
 export type AuthType = 'none' | 'bearer' | 'basic' | 'apikey';

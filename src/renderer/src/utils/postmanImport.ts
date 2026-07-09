@@ -36,13 +36,14 @@ interface PostmanHeader {
   key?: string;
   value?: string;
   disabled?: boolean;
+  description?: string;
 }
 
 interface PostmanBody {
   mode?: 'raw' | 'urlencoded' | 'formdata' | 'graphql' | 'file';
   raw?: string;
-  urlencoded?: { key?: string; value?: string; disabled?: boolean }[];
-  formdata?: { key?: string; value?: string; type?: string; disabled?: boolean }[];
+  urlencoded?: { key?: string; value?: string; disabled?: boolean; description?: string }[];
+  formdata?: { key?: string; value?: string; type?: string; disabled?: boolean; description?: string }[];
   graphql?: { query?: string; variables?: string };
   options?: { raw?: { language?: string } };
 }
@@ -119,7 +120,7 @@ function convertPathVariables(url: PostmanUrl | string | undefined, resolvedUrl:
 function convertHeaders(headers: PostmanHeader[] | undefined): KeyValue[] {
   return (headers ?? [])
     .filter((h) => h.key)
-    .map((h) => emptyKeyValue({ key: h.key ?? '', value: h.value ?? '', enabled: !h.disabled }));
+    .map((h) => emptyKeyValue({ key: h.key ?? '', value: h.value ?? '', enabled: !h.disabled, description: h.description ?? '' }));
 }
 
 function authParam(params: PostmanAuthParam[] | undefined, key: string): string {
@@ -182,7 +183,7 @@ function convertBody(body: PostmanBody | undefined): RequestBody {
       result.formUrlEncoded = [
         ...(body.urlencoded ?? [])
           .filter((f) => f.key)
-          .map((f) => emptyKeyValue({ key: f.key ?? '', value: f.value ?? '', enabled: !f.disabled })),
+          .map((f) => emptyKeyValue({ key: f.key ?? '', value: f.value ?? '', enabled: !f.disabled, description: f.description ?? '' })),
         emptyKeyValue(),
       ];
       break;
@@ -193,7 +194,14 @@ function convertBody(body: PostmanBody | undefined): RequestBody {
         // text field the user can refill, rather than silently dropped.
         ...(body.formdata ?? [])
           .filter((f) => f.key)
-          .map((f) => emptyKeyValue({ key: f.key ?? '', value: f.type === 'file' ? '' : (f.value ?? ''), enabled: !f.disabled })),
+          .map((f) =>
+            emptyKeyValue({
+              key: f.key ?? '',
+              value: f.type === 'file' ? '' : (f.value ?? ''),
+              enabled: !f.disabled,
+              description: f.description ?? '',
+            }),
+          ),
         emptyKeyValue(),
       ];
       break;
