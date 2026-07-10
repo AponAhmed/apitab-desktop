@@ -2,7 +2,7 @@
   "name": "apitab-desktop",
   "productName": "ApiTab",
   "description": "Lightweight, local-first API testing desktop app — a fast, minimal alternative to Postman.",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "author": {
     "name": "Muhiminul Haque (Apon)",
     "email": "apon2041@gmail.com"
