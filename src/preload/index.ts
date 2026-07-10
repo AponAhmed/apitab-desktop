@@ -22,6 +22,7 @@ const api = {
   } satisfies StorageApi,
   app: {
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
+    getPlatform: () => ipcRenderer.invoke('app:getPlatform'),
   } satisfies AppApi,
   update: {
     getStatus: () => ipcRenderer.invoke('update:getStatus'),

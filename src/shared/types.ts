@@ -80,6 +80,8 @@ export interface StorageApi {
 /** Desktop equivalent of the extension's `browser.runtime.getManifest().version`. */
 export interface AppApi {
   getVersion(): Promise<string>;
+  /** `process.platform` ('win32' | 'darwin' | 'linux' | ...) — renderer has no direct Node access. */
+  getPlatform(): Promise<string>;
 }
 
 /**

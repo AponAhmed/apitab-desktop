@@ -69,6 +69,7 @@ app.whenReady().then(() => {
 
   // Desktop equivalent of the extension's `browser.runtime.getManifest().version`.
   ipcMain.handle('app:getVersion', () => app.getVersion());
+  ipcMain.handle('app:getPlatform', () => process.platform);
 
   registerAutoUpdate();
 
