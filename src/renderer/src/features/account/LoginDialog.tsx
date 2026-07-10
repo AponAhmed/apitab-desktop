@@ -92,7 +92,10 @@ export function LoginDialog() {
     try {
       const { teams } = await apiClient.fetchTeams();
       setTeams(teams);
-      void runAllTeamsSync();
+      // skipRehydrate: session/teams were just set in-memory above; rehydrating
+      // from disk here races their (unawaited) persist writes and can clobber
+      // them back to null/[] — see runAllTeamsSync's own doc comment.
+      void runAllTeamsSync({ skipRehydrate: true });
     } catch {
       // Non-fatal — teams can be loaded later from the team switcher.
     }

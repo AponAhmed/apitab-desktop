@@ -163,19 +163,26 @@ export function ShareToTeamDialog() {
                       <div className="min-w-0">
                         <p className="truncate text-sm text-slate-800 dark:text-slate-100">{m.name}</p>
                         <p className="truncate text-xs text-slate-500 dark:text-slate-400">{m.email}</p>
+                        {status === 'declined' && (
+                          <p className="truncate text-xs text-slate-400 dark:text-slate-500">
+                            Previously declined — check to re-invite
+                          </p>
+                        )}
                       </div>
-                      {status ? (
+                      {status === 'accepted' || status === 'pending' ? (
                         <span
                           className={cn(
                             'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium capitalize',
                             status === 'accepted' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400',
                             status === 'pending' && 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400',
-                            status === 'declined' && 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400',
                           )}
                         >
                           {status}
                         </span>
                       ) : (
+                        // No row yet, or previously `declined` — both are
+                        // re-assignable; the backend's assign endpoint
+                        // already resets a declined row back to pending.
                         <Toggle
                           checked={selected.has(m.userId)}
                           onChange={() => toggleSelected(m.userId)}
