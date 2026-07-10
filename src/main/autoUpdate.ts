@@ -21,9 +21,16 @@ autoUpdater.on('download-progress', (p) =>
 autoUpdater.on('update-downloaded', (info) => setStatus({ state: 'downloaded', version: info.version }));
 autoUpdater.on('error', (err) => setStatus({ state: 'error', message: err.message }));
 
+// electron-updater's Linux updater only works from a real .AppImage launch
+// (it needs the APPIMAGE env var the AppImage runtime sets). The tar.gz
+// build we also publish has no such runtime, so treat that combination the
+// same as an unpacked dev run instead of letting electron-updater log its
+// "APPIMAGE env is not defined" warning on every startup.
+const isUnsupportedLinuxBuild = process.platform === 'linux' && !process.env.APPIMAGE;
+
 /** Wires the update IPC surface. No-ops (reports `unsupported`) for unpacked dev runs. */
 export function registerAutoUpdate(): void {
-  if (!app.isPackaged) {
+  if (!app.isPackaged || isUnsupportedLinuxBuild) {
     ipcMain.handle('update:getStatus', () => ({ state: 'unsupported' }) satisfies UpdateStatus);
     ipcMain.handle('update:check', () => {});
     ipcMain.handle('update:download', () => {});
