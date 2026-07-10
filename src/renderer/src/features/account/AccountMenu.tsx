@@ -7,7 +7,7 @@ import { useTeamVariablesStore } from '@/stores/teamVariablesStore';
 import { useDialogStore } from '@/stores/dialogStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { apiClient } from '@/services/apiClient';
-import { runAllTeamsSync } from '@/services/syncService';
+import { clearTeamCollectionsOnLogout, runAllTeamsSync } from '@/services/syncService';
 import { toast } from '@/stores/toastStore';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
@@ -122,6 +122,7 @@ export function AccountAvatar() {
     clearSession();
     resetTeams();
     useTeamVariablesStore.getState().reset();
+    clearTeamCollectionsOnLogout();
     toast.info('Logged out');
   };
 

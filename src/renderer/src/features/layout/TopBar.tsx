@@ -10,6 +10,7 @@ import { EnvironmentSelector } from '@/features/environments/EnvironmentSelector
 import { TeamSelector, SyncButton, AccountAvatar } from '@/features/account/AccountMenu';
 import { LoginDialog } from '@/features/account/LoginDialog';
 import { PendingAssignmentsBell } from '@/components/PendingAssignmentsBell';
+import { UpdateAvailableBell } from '@/components/UpdateAvailableBell';
 
 /** Shared "clustered & bordered" pill styling for the context/utility control groups. */
 const CLUSTER =
@@ -68,6 +69,7 @@ export function TopBar() {
         <div className={CLUSTER}>
           <SyncButton />
           <PendingAssignmentsBell />
+          <UpdateAvailableBell />
           <ThemeToggle />
           <IconButton size="sm" title="About" aria-label="About ApiTab" onClick={() => setAboutOpen(true)}>
             <Info className="h-4 w-4" />

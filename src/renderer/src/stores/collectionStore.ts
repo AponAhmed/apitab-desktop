@@ -45,6 +45,14 @@ interface CollectionState {
    * upsert-by-id cannot represent.
    */
   mergeSync: (teamId: string, incoming: Collection[], deletedIds: string[]) => void;
+  /**
+   * Drops every team-tagged collection (they'll re-arrive via /sync on next
+   * login) while preserving local, untagged ones. Call on logout — without
+   * this, a different account logging in on the same device would still see
+   * the previous account's team collections until the next sync overwrites
+   * them, and could briefly act on stale/foreign data in the meantime.
+   */
+  clearTeamCollections: () => void;
 }
 
 function bump(collections: Collection[], id: string) {
@@ -225,6 +233,9 @@ export const useCollectionStore = create<CollectionState>()(
           }
           return { collections: [...byId.values()] };
         }),
+
+      clearTeamCollections: () =>
+        set((s) => ({ collections: s.collections.filter((c) => !c.teamId) })),
     }),
     {
       name: 'apitab:collections',

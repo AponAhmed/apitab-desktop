@@ -110,6 +110,23 @@ function onCollectionsChanged(
 }
 
 /**
+ * Clears team-tagged collections from local state on logout. Without the
+ * `applyingRemote` guard, the collections.subscribe() watcher above sees
+ * this the same as a user deleting every team collection they can see — and
+ * for an owner/admin, that pushes a *real* DELETE to the server for each
+ * one. This wrapper is the only safe way to call `clearTeamCollections()`;
+ * never call it directly from a logout handler.
+ */
+export function clearTeamCollectionsOnLogout(): void {
+  applyingRemote = true;
+  try {
+    useCollectionStore.getState().clearTeamCollections();
+  } finally {
+    applyingRemote = false;
+  }
+}
+
+/**
  * Last known pushed/pulled `{teamId, updatedAt}` per *environment variable*
  * id that's flagged `shared`. Keyed by the variable's own id so a push and a
  * later pull agree on identity even though environments themselves never
@@ -323,14 +340,25 @@ export async function runSyncTick(teamId: string): Promise<void> {
   }
 }
 
-/** Runs one polling pass across every team the user belongs to. No-op if logged out. */
-export async function runAllTeamsSync(): Promise<void> {
-  // Storage hydration is async (IPC round-trip to the main process) — make
-  // sure it has finished before trusting `session`/`teams`, otherwise a poll
-  // that fires very early (e.g. on first mount) could read stale (empty)
-  // initial state and silently skip.
-  await useAccountStore.persist.rehydrate();
-  await useTeamStore.persist.rehydrate();
+/**
+ * Runs one polling pass across every team the user belongs to. No-op if logged out.
+ *
+ * `skipRehydrate` must be passed by callers that just wrote `session`/`teams`
+ * themselves in this same tick (e.g. right after login). Rehydrating there
+ * races that write's own (unawaited) persist to storage — if the read wins,
+ * it silently overwrites the fresh in-memory state with the still-in-flight
+ * or stale on-disk copy (session reverts to null, or teams to []), aborting
+ * the sync below with no error and an empty workspace.
+ */
+export async function runAllTeamsSync(opts?: { skipRehydrate?: boolean }): Promise<void> {
+  if (!opts?.skipRehydrate) {
+    // Storage hydration is async (IPC round-trip to the main process) — make
+    // sure it has finished before trusting `session`/`teams`, otherwise a poll
+    // that fires very early (e.g. on first mount) could read stale (empty)
+    // initial state and silently skip.
+    await useAccountStore.persist.rehydrate();
+    await useTeamStore.persist.rehydrate();
+  }
 
   const session = useAccountStore.getState().session;
   if (!session) return;
