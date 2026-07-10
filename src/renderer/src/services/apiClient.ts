@@ -215,4 +215,17 @@ export const apiClient = {
 
   unshareCollection: (teamId: string, collectionId: string) =>
     request<{ message: string }>('POST', `/teams/${teamId}/collections/${collectionId}/unshare`),
+
+  // Usage analytics — deliberately best-effort; callers swallow errors so a
+  // flaky network never affects the app itself. `auth: true` (the request()
+  // default) attaches the session token when signed in and is silently
+  // omitted when not, so the same call works anonymous or identified.
+  startAnalyticsSession: (sessionId: string, platform: string, appVersion: string) =>
+    request<{ ok: true }>('POST', '/analytics/session/start', { sessionId, platform, appVersion }),
+
+  heartbeatAnalyticsSession: (sessionId: string) =>
+    request<{ ok: true }>('POST', '/analytics/session/heartbeat', { sessionId }),
+
+  endAnalyticsSession: (sessionId: string) =>
+    request<{ ok: true }>('POST', '/analytics/session/end', { sessionId }),
 };
