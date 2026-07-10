@@ -44,5 +44,13 @@ linux:
       arch: [x64]
     - target: tar.gz
       arch: [x64]
+    - target: deb
+      arch: [x64]
+    - target: rpm
+      arch: [x64]
   category: Development
+  # electron-builder requires this for deb/rpm; falls back to package.json's
+  # author otherwise, but that's "Name (parenthetical)" — not a valid
+  # maintainer string, so dpkg-deb / rpmbuild would reject it.
+  maintainer: Muhiminul Haque <apon2041@gmail.com>
 npmRebuild: false

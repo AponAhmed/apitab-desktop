@@ -28,6 +28,11 @@ jobs:
 
       - run: npm ci
 
+      # rpmbuild isn't preinstalled on ubuntu-latest — electron-builder's rpm
+      # target shells out to it and fails outright without this.
+      - if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
       # Without this, electron-builder searches the runner's keychain for a
       # code-signing certificate on macOS and fails outright when it finds
       # none, instead of falling back to an unsigned build.
@@ -53,6 +58,8 @@ jobs:
             dist/*.dmg
             dist/*.tar.gz
             dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
             dist/latest*.yml
             dist/*.blockmap
           if-no-files-found: ignore
