@@ -49,3 +49,28 @@ export const COMMON_CONTENT_TYPES = [
   'application/xml',
   'multipart/form-data',
 ];
+
+/**
+ * Value suggestions keyed by lowercased header name, for the Headers tab's
+ * per-row value autocomplete — once a row's key matches (or is being typed
+ * toward) one of these, its own value cell suggests only what's actually
+ * valid for that header, instead of one blanket list shared by every row.
+ * Headers with no fixed vocabulary (Cookie, Origin, Referer, User-Agent,
+ * X-API-Key, ...) are deliberately omitted — free text, no suggestions.
+ */
+export const COMMON_HEADER_VALUES: Record<string, string[]> = {
+  accept: [...COMMON_CONTENT_TYPES, '*/*'],
+  'content-type': COMMON_CONTENT_TYPES,
+  authorization: ['Bearer ', 'Basic '],
+  'accept-encoding': ['gzip', 'deflate', 'br', 'identity', '*'],
+  'content-encoding': ['gzip', 'deflate', 'br'],
+  'cache-control': ['no-cache', 'no-store', 'max-age=0', 'must-revalidate', 'public', 'private'],
+  pragma: ['no-cache'],
+  connection: ['keep-alive', 'close'],
+  'x-requested-with': ['XMLHttpRequest'],
+};
+
+/** Looks up `COMMON_HEADER_VALUES` case-insensitively (header names are, per spec). */
+export function headerValueSuggestions(headerName: string): string[] | undefined {
+  return COMMON_HEADER_VALUES[headerName.trim().toLowerCase()];
+}
