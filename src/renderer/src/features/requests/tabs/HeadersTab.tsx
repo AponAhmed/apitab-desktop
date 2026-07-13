@@ -1,6 +1,6 @@
 import { useRequestStore } from '@/stores/requestStore';
 import { KeyValueEditor } from '@/components/KeyValueEditor';
-import { COMMON_CONTENT_TYPES, COMMON_HEADERS } from '@/utils/ui';
+import { COMMON_HEADERS, headerValueSuggestions } from '@/utils/ui';
 
 export function HeadersTab() {
   const headers = useRequestStore((s) => s.request.headers);
@@ -16,7 +16,7 @@ export function HeadersTab() {
         keyPlaceholder="Header"
         valuePlaceholder="Value"
         keySuggestions={COMMON_HEADERS}
-        valueSuggestions={COMMON_CONTENT_TYPES}
+        valueSuggestionsForKey={headerValueSuggestions}
         showNotes
       />
     </div>

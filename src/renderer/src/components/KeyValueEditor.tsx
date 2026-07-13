@@ -1,9 +1,10 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type FocusEvent } from 'react';
 import { Trash2, Share2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Toggle } from './ui/Toggle';
 import { IconButton } from './ui/IconButton';
 import { VariableInput } from './VariableInput';
+import { SuggestionDropdown } from './SuggestionDropdown';
 import type { KeyValue } from '@/types';
 
 interface KeyValueEditorProps {
@@ -14,6 +15,14 @@ interface KeyValueEditorProps {
   valuePlaceholder?: string;
   keySuggestions?: string[];
   valueSuggestions?: string[];
+  /**
+   * Per-row value suggestions derived from that row's own key (e.g. Headers:
+   * suggest `application/json` etc. only once the key reads `Content-Type`).
+   * Takes precedence over `valueSuggestions` when it returns a non-empty
+   * list for a given row; falls back to `valueSuggestions` (or nothing)
+   * otherwise, so keys with no known vocabulary still work as plain text.
+   */
+  valueSuggestionsForKey?: (key: string) => string[] | undefined;
   /** Highlight `{{variables}}` and show the hover editor (default true). */
   enableVariables?: boolean;
   /** Grid track sizes for the key/value columns (default equal width). */
@@ -47,60 +56,90 @@ function autosize(el: HTMLTextAreaElement | null) {
  * A value cell that expands into a wrapping, auto-growing textarea while
  * focused (so long values like tokens/URLs are fully visible while editing),
  * and collapses back to the compact single-line view on blur.
+ *
+ * Suggestions are a custom floating dropdown (`SuggestionDropdown`), not a
+ * native `<datalist>` — a `<textarea>` has no `list` attribute at all per
+ * the HTML spec, so a datalist-based approach would silently stop
+ * suggesting the instant this cell expands into one on focus.
  */
 function ExpandableValueCell({
   value,
   onChange,
   placeholder,
-  listId,
+  suggestions,
   dim,
   enableVariables,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  listId?: string;
+  suggestions?: string[];
   dim: boolean;
   enableVariables: boolean;
 }) {
   const [focused, setFocused] = useState(false);
+  const [anchor, setAnchor] = useState<DOMRect | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (focused) autosize(textareaRef.current);
   }, [focused, value]);
 
+  const filtered = useMemo(() => {
+    if (!focused || !suggestions || suggestions.length === 0) return [];
+    const q = value.trim().toLowerCase();
+    return suggestions.filter((s) => !q || (s.toLowerCase().startsWith(q) && s.toLowerCase() !== q));
+  }, [focused, suggestions, value]);
+
+  const select = (v: string) => {
+    onChange(v);
+    setFocused(false);
+  };
+
+  const dropdown = anchor && filtered.length > 0 && (
+    <SuggestionDropdown suggestions={filtered} anchor={anchor} onSelect={select} />
+  );
+
   if (focused) {
     return (
-      <textarea
-        ref={textareaRef}
-        value={value}
-        placeholder={placeholder}
-        spellCheck={false}
-        autoFocus
-        rows={1}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={() => setFocused(false)}
-        className={cn(
-          inputClass,
-          'h-auto resize-none overflow-hidden whitespace-pre-wrap break-all py-1.5 font-mono leading-snug',
-          'border-l border-slate-200 dark:border-slate-800',
-        )}
-      />
+      <>
+        <textarea
+          ref={textareaRef}
+          value={value}
+          placeholder={placeholder}
+          spellCheck={false}
+          autoFocus
+          rows={1}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={(e) => setAnchor(e.currentTarget.getBoundingClientRect())}
+          onBlur={() => setFocused(false)}
+          className={cn(
+            inputClass,
+            'h-auto resize-none overflow-hidden whitespace-pre-wrap break-all py-1.5 font-mono leading-snug',
+            'border-l border-slate-200 dark:border-slate-800',
+          )}
+        />
+        {dropdown}
+      </>
     );
   }
 
   return (
-    <Cell
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      listId={listId}
-      dim={dim}
-      borderL
-      enableVariables={enableVariables}
-      onFocus={() => setFocused(true)}
-    />
+    <>
+      <Cell
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        dim={dim}
+        borderL
+        enableVariables={enableVariables}
+        onFocus={(e) => {
+          setAnchor(e.currentTarget.getBoundingClientRect());
+          setFocused(true);
+        }}
+      />
+      {dropdown}
+    </>
   );
 }
 
@@ -121,7 +160,7 @@ function Cell({
   dim: boolean;
   borderL?: boolean;
   enableVariables: boolean;
-  onFocus?: () => void;
+  onFocus?: (e: FocusEvent<HTMLInputElement>) => void;
 }) {
   const border = borderL ? 'border-l border-slate-200 dark:border-slate-800' : undefined;
   if (enableVariables) {
@@ -159,6 +198,7 @@ export function KeyValueEditor({
   valuePlaceholder = 'Value',
   keySuggestions,
   valueSuggestions,
+  valueSuggestionsForKey,
   enableVariables = true,
   columnRatio = ['1fr', '1fr'],
   showShareToggle = false,
@@ -169,7 +209,6 @@ export function KeyValueEditor({
   showNotes = false,
 }: KeyValueEditorProps) {
   const keyListId = useId();
-  const valueListId = useId();
   const shareCol = showShareToggle ? ' 2rem' : '';
   const removeCol = hideRemove ? '' : ' 2.25rem';
   const notesCol = showNotes ? ' 1fr' : '';
@@ -195,17 +234,11 @@ export function KeyValueEditor({
           ))}
         </datalist>
       )}
-      {valueSuggestions && (
-        <datalist id={valueListId}>
-          {valueSuggestions.map((s) => (
-            <option key={s} value={s} />
-          ))}
-        </datalist>
-      )}
       {rows.map((row, i) => {
         const isTrailing = i === rows.length - 1 && row.key === '' && row.value === '';
         const dim = !row.enabled && !isTrailing;
         const shared = sharedIds?.has(row.id) ?? false;
+        const rowValueSuggestions = valueSuggestionsForKey?.(row.key) ?? valueSuggestions;
         return (
           <div
             key={row.id}
@@ -246,7 +279,7 @@ export function KeyValueEditor({
               value={row.value}
               onChange={(v) => onChange(row.id, { value: v })}
               placeholder={valuePlaceholder}
-              listId={valueSuggestions ? valueListId : undefined}
+              suggestions={rowValueSuggestions}
               dim={dim}
               enableVariables={enableVariables}
             />
