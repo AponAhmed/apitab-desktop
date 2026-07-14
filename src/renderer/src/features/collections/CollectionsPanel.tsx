@@ -69,6 +69,7 @@ function RequestNode({
 }) {
   const actions = useActions();
   const active = actions.activeRequestId === request.id;
+  const isDirty = useRequestStore((s) => s.isDirty);
   const items: MenuItem[] = [
     { label: 'Duplicate', icon: Copy, onClick: () => actions.duplicateRequest(request.id) },
     { label: 'Delete', icon: Trash2, danger: true, onClick: () => actions.deleteRequest(request) },
@@ -89,6 +90,13 @@ function RequestNode({
       <span className="min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-300">
         {request.name || request.url || 'Untitled'}
       </span>
+      {active && isDirty && (
+        <span
+          className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500"
+          title="Unsaved changes — saving shortly"
+          aria-label="Unsaved changes"
+        />
+      )}
       <div className="opacity-0 group-hover:opacity-100">
         <Menu items={items} label="Request actions" />
       </div>

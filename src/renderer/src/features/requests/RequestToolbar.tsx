@@ -9,6 +9,7 @@ export function RequestToolbar() {
   const name = useRequestStore((s) => s.request.name);
   const setName = useRequestStore((s) => s.setName);
   const savedRef = useRequestStore((s) => s.savedRef);
+  const isDirty = useRequestStore((s) => s.isDirty);
   const newRequest = useRequestStore((s) => s.newRequest);
   const openImportCurl = useDialogStore((s) => s.openImportCurl);
   const { save } = useRequestActions();
@@ -22,7 +23,14 @@ export function RequestToolbar() {
         className="min-w-0 flex-1 truncate bg-transparent text-sm font-semibold text-slate-700 placeholder:font-normal placeholder:text-slate-400 focus:outline-none dark:text-slate-200"
         aria-label="Request name"
       />
-      {savedRef && (
+      {savedRef && isDirty && (
+        <span
+          className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500"
+          title="Unsaved changes — saving shortly"
+          aria-label="Unsaved changes"
+        />
+      )}
+      {savedRef && !isDirty && (
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
           Saved
         </span>

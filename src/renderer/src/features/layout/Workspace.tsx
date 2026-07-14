@@ -5,6 +5,7 @@ import { useRequestActions } from '@/hooks/useRequestActions';
 import { usePanelResize, useHorizontalResize } from '@/hooks/usePanelResize';
 import { useTeamSync } from '@/hooks/useTeamSync';
 import { useAnalyticsSession } from '@/hooks/useAnalyticsSession';
+import { useAutoSaveRequest } from '@/hooks/useAutoSaveRequest';
 import { TopBar } from './TopBar';
 import { Sidebar, SidebarRail } from './Sidebar';
 import { RequestToolbar } from '@/features/requests/RequestToolbar';
@@ -19,6 +20,7 @@ export function Workspace() {
   useApplyTheme();
   useTeamSync();
   useAnalyticsSession();
+  useAutoSaveRequest();
 
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const responseHeight = useUiStore((s) => s.responseHeight);
