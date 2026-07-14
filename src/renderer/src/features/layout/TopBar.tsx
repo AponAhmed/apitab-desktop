@@ -52,6 +52,9 @@ export function TopBar() {
     // is native title-bar behavior a frameless window doesn't get for free.
     <header
       className="flex h-11 shrink-0 items-stretch border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0f111a] [-webkit-app-region:drag]"
+      style={{
+        backgroundImage: 'linear-gradient(311deg, rgb(255 255 255 / 3%) 0%, rgb(255 232 179 / 30%) 100%)',
+      }}
       onDoubleClick={toggleMaximize}
     >
       <div className="flex flex-1 items-center gap-1.5 px-2.5">
