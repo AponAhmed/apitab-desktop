@@ -3,10 +3,8 @@ import { initSyncService, runAllTeamsSync } from '@/services/syncService';
 import { useAccountStore } from '@/stores/accountStore';
 import { useTeamStore } from '@/stores/teamStore';
 
-/** Poll cadence while an ApiTab page is open and focused — fast enough that a freshly-shared collection's Accept/Decline popover shows up without a re-login. */
-const FOCUSED_POLL_MS = 7_000;
-/** Cadence while open but unfocused (or, in the extension, whenever no page has focus at all). */
-const BLURRED_POLL_MS = 600_000; // 10 minutes
+/** Background auto-sync cadence. Manual sync (the toolbar button) is unaffected and always fires immediately on click. */
+const POLL_MS = 300_000; // 5 minutes
 
 /**
  * Wires the push-on-mutation watcher (once per page) and triggers an
@@ -25,11 +23,10 @@ export function useTeamSync() {
     if (loggedIn && teamCount > 0) void runAllTeamsSync();
   }, [loggedIn, teamCount]);
 
-  // Focus-aware fast polling: self-rescheduling setTimeout (not setInterval,
-  // so a slow tick can't overlap the next one) rather than a flat interval.
-  // "Foreground" is simply "this page is open and focused" — the same
-  // concept applies whether this hook is mounted in the desktop's single
-  // renderer or an open extension tab.
+  // Self-rescheduling setTimeout (not setInterval, so a slow tick can't
+  // overlap the next one). Regaining focus jumps straight to an immediate
+  // sync rather than waiting out a stale tick, so switching back to the tab
+  // always shows fresh data without needing a manual click.
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -38,15 +35,15 @@ export function useTeamSync() {
       if (cancelled) return;
       void runAllTeamsSync().finally(() => {
         if (cancelled) return;
-        timer = setTimeout(tick, document.hasFocus() ? FOCUSED_POLL_MS : BLURRED_POLL_MS);
+        timer = setTimeout(tick, POLL_MS);
       });
     };
     const onFocus = () => {
       if (timer) clearTimeout(timer);
-      tick(); // jump straight to a fast poll instead of waiting out a stale blurred-tier tick
+      tick();
     };
 
-    timer = setTimeout(tick, document.hasFocus() ? FOCUSED_POLL_MS : BLURRED_POLL_MS);
+    timer = setTimeout(tick, POLL_MS);
     window.addEventListener('focus', onFocus);
     return () => {
       cancelled = true;
