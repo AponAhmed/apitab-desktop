@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { apiClient } from '@/services/apiClient';
+import { useAccountStore } from '@/stores/accountStore';
 import { uuid } from '@/utils/id';
 import { getAppVersion, getPlatform } from '@/utils/runtimeInfo';
 
@@ -19,6 +20,14 @@ export function useAnalyticsSession() {
     let cancelled = false;
 
     void (async () => {
+      // On a fresh app launch, accountStore's own automatic hydration from
+      // disk may not have finished yet — without this, a genuinely logged-in
+      // user's very first session/start call (fired the instant this effect
+      // mounts) reads `session` as still null and goes out unauthenticated,
+      // permanently miscounting them as anonymous for that session's whole
+      // lifetime (heartbeat only upgrades an existing session later; a short
+      // visit that ends before the first heartbeat never gets the chance).
+      await useAccountStore.persist.rehydrate();
       const [platform, appVersion] = await Promise.all([getPlatform(), getAppVersion()]);
       if (cancelled) return;
       try {
