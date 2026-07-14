@@ -19,6 +19,9 @@ function createWindow(): void {
     height: 800,
     show: false,
     autoHideMenuBar: true,
+    // No native title bar on any platform — TopBar.tsx is the drag region
+    // and owns minimize/maximize/close via the custom WindowControls below.
+    frame: false,
     // Sets the taskbar/title-bar icon during `npm run dev` and on Linux
     // (which doesn't embed an icon into the executable the way
     // electron-builder does for Windows/.ico and macOS/.icns).
@@ -32,6 +35,12 @@ function createWindow(): void {
   });
 
   mainWindow.on('ready-to-show', () => mainWindow.show());
+
+  // Lets WindowControls.tsx keep its maximize/restore icon in sync with
+  // state changes that don't originate from its own button (double-clicking
+  // the drag region, Windows' Aero Snap, etc).
+  mainWindow.on('maximize', () => mainWindow.webContents.send('window:maximized-change', true));
+  mainWindow.on('unmaximize', () => mainWindow.webContents.send('window:maximized-change', false));
 
   // Open links clicked inside the app in the OS browser, not a new Electron window.
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -70,6 +79,22 @@ app.whenReady().then(() => {
   // Desktop equivalent of the extension's `browser.runtime.getManifest().version`.
   ipcMain.handle('app:getVersion', () => app.getVersion());
   ipcMain.handle('app:getPlatform', () => process.platform);
+
+  // Custom title-bar controls (the window is `frame: false` — see createWindow).
+  // `BrowserWindow.fromWebContents` rather than a captured `mainWindow`
+  // reference, since this app can recreate its window on macOS `activate`.
+  ipcMain.handle('window:minimize', (event) => BrowserWindow.fromWebContents(event.sender)?.minimize());
+  ipcMain.handle('window:toggleMaximize', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win) return;
+    if (win.isMaximized()) win.unmaximize();
+    else win.maximize();
+  });
+  ipcMain.handle('window:close', (event) => BrowserWindow.fromWebContents(event.sender)?.close());
+  ipcMain.handle(
+    'window:isMaximized',
+    (event) => BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false,
+  );
 
   registerAutoUpdate();
 

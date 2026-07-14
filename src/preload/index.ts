@@ -1,6 +1,14 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { electronAPI } from '@electron-toolkit/preload';
-import type { AppApi, PreparedRequest, RequestResult, StorageApi, UpdateApi, UpdateStatus } from '@shared/types';
+import type {
+  AppApi,
+  PreparedRequest,
+  RequestResult,
+  StorageApi,
+  UpdateApi,
+  UpdateStatus,
+  WindowApi,
+} from '@shared/types';
 
 /**
  * Renderer-facing API surface, matching the extension's two touchpoints with
@@ -37,6 +45,19 @@ const api = {
       };
     },
   } satisfies UpdateApi,
+  window: {
+    minimize: () => ipcRenderer.invoke('window:minimize'),
+    toggleMaximize: () => ipcRenderer.invoke('window:toggleMaximize'),
+    close: () => ipcRenderer.invoke('window:close'),
+    isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+    onMaximizedChange: (cb: (isMaximized: boolean) => void) => {
+      const listener = (_event: unknown, isMaximized: boolean) => cb(isMaximized);
+      ipcRenderer.on('window:maximized-change', listener);
+      return () => {
+        ipcRenderer.removeListener('window:maximized-change', listener);
+      };
+    },
+  } satisfies WindowApi,
 };
 
 export type Api = typeof api;

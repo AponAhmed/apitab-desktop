@@ -11,6 +11,8 @@ import { TeamSelector, SyncButton, AccountAvatar } from '@/features/account/Acco
 import { LoginDialog } from '@/features/account/LoginDialog';
 import { PendingAssignmentsBell } from '@/components/PendingAssignmentsBell';
 import { UpdateAvailableBell } from '@/components/UpdateAvailableBell';
+import { WindowControls } from '@/components/WindowControls';
+import { useWindowControls } from '@/hooks/useWindowControls';
 
 /** Shared "clustered & bordered" pill styling for the context/utility control groups. */
 const CLUSTER =
@@ -41,46 +43,62 @@ export function TopBar() {
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const openSettings = useDialogStore((s) => s.openSettings);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const { toggleMaximize } = useWindowControls();
 
   return (
-    <header className="flex h-11 shrink-0 items-center gap-1.5 border-b border-slate-200 bg-white px-2.5 dark:border-slate-800 dark:bg-[#0f111a]">
-      <IconButton size="sm" title="Toggle sidebar" aria-label="Toggle sidebar" onClick={toggleSidebar}>
-        <PanelLeft className="h-4 w-4" />
-      </IconButton>
-
-      <div className="flex items-center gap-1.5 text-brand-500">
-        <Logo className="h-5 w-5" />
-        <span className="text-sm font-semibold tracking-wide text-slate-900 dark:text-slate-100">
-          ApiTab
-        </span>
-      </div>
-
-      <div className="flex-1" />
-
-      <div className="mr-1.5 flex items-center gap-1.5">
-        {/* Context: what you're working in. */}
-        <div className={CLUSTER}>
-          <EnvironmentSelector />
-          <div className="mx-0.5 h-4 w-px bg-slate-200 dark:bg-slate-700" />
-          <TeamSelector />
-        </div>
-
-        {/* Utilities: sync, notifications, app-level actions. */}
-        <div className={CLUSTER}>
-          <SyncButton />
-          <PendingAssignmentsBell />
-          <UpdateAvailableBell />
-          <ThemeToggle />
-          <IconButton size="sm" title="About" aria-label="About ApiTab" onClick={() => setAboutOpen(true)}>
-            <Info className="h-4 w-4" />
-          </IconButton>
-          <IconButton size="sm" title="Settings" aria-label="Open settings" onClick={openSettings}>
-            <Settings className="h-4 w-4" />
+    // The drag region for moving the window (frame: false — see main/index.ts).
+    // Every interactive child below opts back out with no-drag, since a drag
+    // region swallows clicks on anything inside it. Double-click-to-maximize
+    // is native title-bar behavior a frameless window doesn't get for free.
+    <header
+      className="flex h-11 shrink-0 items-stretch border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0f111a] [-webkit-app-region:drag]"
+      onDoubleClick={toggleMaximize}
+    >
+      <div className="flex flex-1 items-center gap-1.5 px-2.5">
+        <div className="[-webkit-app-region:no-drag]">
+          <IconButton size="sm" title="Toggle sidebar" aria-label="Toggle sidebar" onClick={toggleSidebar}>
+            <PanelLeft className="h-4 w-4" />
           </IconButton>
         </div>
+
+        <div className="flex items-center gap-1.5 text-brand-500">
+          <Logo className="h-5 w-5" />
+          <span className="text-sm font-semibold tracking-wide text-slate-900 dark:text-slate-100">
+            ApiTab
+          </span>
+        </div>
+
+        <div className="flex-1" />
+
+        <div className="mr-1.5 flex items-center gap-1.5 [-webkit-app-region:no-drag]">
+          {/* Context: what you're working in. */}
+          <div className={CLUSTER}>
+            <EnvironmentSelector />
+            <div className="mx-0.5 h-4 w-px bg-slate-200 dark:bg-slate-700" />
+            <TeamSelector />
+          </div>
+
+          {/* Utilities: sync, notifications, app-level actions. */}
+          <div className={CLUSTER}>
+            <SyncButton />
+            <PendingAssignmentsBell />
+            <UpdateAvailableBell />
+            <ThemeToggle />
+            <IconButton size="sm" title="About" aria-label="About ApiTab" onClick={() => setAboutOpen(true)}>
+              <Info className="h-4 w-4" />
+            </IconButton>
+            <IconButton size="sm" title="Settings" aria-label="Open settings" onClick={openSettings}>
+              <Settings className="h-4 w-4" />
+            </IconButton>
+          </div>
+        </div>
+
+        <div className="[-webkit-app-region:no-drag]">
+          <AccountAvatar />
+        </div>
       </div>
 
-      <AccountAvatar />
+      <WindowControls />
 
       <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
       <LoginDialog />

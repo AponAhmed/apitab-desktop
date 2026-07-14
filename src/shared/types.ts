@@ -107,3 +107,18 @@ export interface UpdateApi {
   /** Returns an unsubscribe function. */
   onStatus(cb: (status: UpdateStatus) => void): () => void;
 }
+
+/**
+ * Custom title-bar controls, needed because the window is created with
+ * `frame: false` (main/index.ts) — there is no native minimize/maximize/close
+ * chrome to fall back on for any platform.
+ */
+export interface WindowApi {
+  minimize(): Promise<void>;
+  /** Toggles between maximized and restored. */
+  toggleMaximize(): Promise<void>;
+  close(): Promise<void>;
+  isMaximized(): Promise<boolean>;
+  /** Returns an unsubscribe function. */
+  onMaximizedChange(cb: (isMaximized: boolean) => void): () => void;
+}
