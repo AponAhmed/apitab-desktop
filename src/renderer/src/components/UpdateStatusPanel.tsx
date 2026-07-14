@@ -1,10 +1,20 @@
 import { AlertCircle, CheckCircle2, Download, RefreshCw } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { Button } from './ui/Button';
 import { useAutoUpdate } from '@/hooks/useAutoUpdate';
 
 /** Update state + actions, shared by AboutDialog and UpdateAvailableBell. */
 export function UpdateStatusPanel() {
   const { status, check, download, install } = useAutoUpdate();
+  // downloadUpdate() resolves the update metadata and opens the request
+  // before the first 'download-progress' event fires, so status stays
+  // 'available' for a beat after the click with nothing on screen to show
+  // for it. This tracks just that gap so the button can show its own
+  // spinner immediately instead of appearing to do nothing.
+  const [starting, setStarting] = useState(false);
+  useEffect(() => {
+    if (status.state !== 'available') setStarting(false);
+  }, [status.state]);
 
   if (status.state === 'unsupported') return null;
 
@@ -19,8 +29,20 @@ export function UpdateStatusPanel() {
           <p className="text-xs text-slate-600 dark:text-slate-300">
             Update available: <span className="font-medium">v{status.version}</span>
           </p>
-          <Button size="sm" onClick={() => void download()}>
-            <Download className="h-3.5 w-3.5" /> Update Now
+          <Button
+            size="sm"
+            disabled={starting}
+            onClick={() => {
+              setStarting(true);
+              void download();
+            }}
+          >
+            {starting ? (
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Download className="h-3.5 w-3.5" />
+            )}
+            {starting ? 'Starting…' : 'Update Now'}
           </Button>
         </div>
       ) : status.state === 'downloading' ? (
