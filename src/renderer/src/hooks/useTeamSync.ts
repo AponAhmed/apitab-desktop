@@ -20,20 +20,23 @@ export function useTeamSync() {
   }, []);
 
   useEffect(() => {
-    if (loggedIn && teamCount > 0) void runAllTeamsSync();
+    if (loggedIn && teamCount > 0) void runAllTeamsSync({ silent: true });
   }, [loggedIn, teamCount]);
 
   // Self-rescheduling setTimeout (not setInterval, so a slow tick can't
   // overlap the next one). Regaining focus jumps straight to an immediate
   // sync rather than waiting out a stale tick, so switching back to the tab
-  // always shows fresh data without needing a manual click.
+  // always shows fresh data without needing a manual click. All of these
+  // (mount, periodic tick, focus-regain) are automatic, not something the
+  // user asked for — `silent: true` keeps the toolbar icon from spinning on
+  // its own; only an explicit manual sync (the button) should animate it.
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const tick = () => {
       if (cancelled) return;
-      void runAllTeamsSync().finally(() => {
+      void runAllTeamsSync({ silent: true }).finally(() => {
         if (cancelled) return;
         timer = setTimeout(tick, POLL_MS);
       });
