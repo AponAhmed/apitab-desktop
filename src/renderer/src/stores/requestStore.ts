@@ -154,6 +154,8 @@ interface RequestState {
   isLoading: boolean;
   sentAt: number | null;
   savedRef: SavedRequestRef | null;
+  /** True once a saved request (savedRef !== null) has edits not yet persisted — drives the auto-save debounce and the unsaved-changes dot. Meaningless for a scratch draft (savedRef === null), which only saves on an explicit action. */
+  isDirty: boolean;
   scriptRun: ScriptRunResult | null;
   activeRequestTab: RequestTab;
   activeResponseTab: ResponseTab;
@@ -217,7 +219,10 @@ export const useRequestStore = create<RequestState>()(
   persist(
     (set, get) => {
       const patch = (mutate: (r: ApiRequest) => ApiRequest) =>
-        set((s) => ({ request: { ...mutate(s.request), updatedAt: Date.now() } }));
+        set((s) => ({
+          request: { ...mutate(s.request), updatedAt: Date.now() },
+          isDirty: s.savedRef !== null,
+        }));
 
       return {
         request: normalizeForEditing(createRequest()),
@@ -226,6 +231,7 @@ export const useRequestStore = create<RequestState>()(
         isLoading: false,
         sentAt: null,
         savedRef: null,
+        isDirty: false,
         scriptRun: null,
         activeRequestTab: 'params',
         activeResponseTab: 'body',
@@ -459,6 +465,7 @@ export const useRequestStore = create<RequestState>()(
           set({
             request: normalizeForEditing(createRequest()),
             savedRef: null,
+            isDirty: false,
             response: null,
             error: null,
             isLoading: false,
@@ -472,6 +479,7 @@ export const useRequestStore = create<RequestState>()(
             return {
               request: normalizeForEditing(structuredClone(req)),
               savedRef,
+              isDirty: false,
               response: cached?.response ?? null,
               error: cached?.error ?? null,
               isLoading: false,
@@ -498,6 +506,7 @@ export const useRequestStore = create<RequestState>()(
               const cached = s.responseCache[oldKey];
               return {
                 savedRef: { containerId, requestId: saved.id },
+                isDirty: false,
                 request: { ...s.request, name: saved.name },
                 responseCache: cached
                   ? { ...s.responseCache, [saved.id]: cached }
@@ -512,6 +521,7 @@ export const useRequestStore = create<RequestState>()(
           const { savedRef, request } = get();
           if (!savedRef) return false;
           useCollectionStore.getState().updateRequest({ ...request, id: savedRef.requestId });
+          set({ isDirty: false });
           return true;
         },
       };
