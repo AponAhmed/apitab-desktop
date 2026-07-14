@@ -37,12 +37,8 @@ export function UpdateStatusPanel() {
               void download();
             }}
           >
-            {starting ? (
-              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Download className="h-3.5 w-3.5" />
-            )}
-            {starting ? 'Starting…' : 'Update Now'}
+            <Download className="h-3.5 w-3.5" />
+            {starting ? 'Updating…' : 'Update Now'}
           </Button>
         </div>
       ) : status.state === 'downloading' ? (
