@@ -33,12 +33,26 @@ jobs:
       - if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y rpm
 
-      # Without this, electron-builder searches the runner's keychain for a
-      # code-signing certificate on macOS and fails outright when it finds
-      # none, instead of falling back to an unsigned build.
+      # Windows code signing (scripts/windows-sign.mjs, SSL.com CodeSignTool
+      # — see that file for why not a .pfx/CSC_LINK). ES_USERNAME unset is
+      # the no-signing-configured case: the sign hook no-ops and the build
+      # stays unsigned exactly as before. TODO once an SSL.com account
+      # exists: add a step here that provisions CodeSignTool onto the
+      # windows-latest runner and sets CODESIGNTOOL_PATH — deliberately not
+      # added yet, since SSL.com's public download page is an HTML landing
+      # page, not a stable versioned URL safe to curl in CI; get the actual
+      # download link from the account portal first.
       - run: npm run ${{ matrix.script }}
         env:
+          # Stops electron-builder from searching the runner's keychain for
+          # a macOS code-signing certificate and failing outright when it
+          # finds none — falls back to an unsigned build instead.
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          ES_USERNAME: ${{ secrets.ES_USERNAME }}
+          ES_PASSWORD: ${{ secrets.ES_PASSWORD }}
+          ES_CREDENTIAL_ID: ${{ secrets.ES_CREDENTIAL_ID }}
+          ES_TOTP_SECRET: ${{ secrets.ES_TOTP_SECRET }}
+          CODESIGNTOOL_PATH: ${{ vars.CODESIGNTOOL_PATH }}
 
       # Unsigned builds: Windows shows an "unknown publisher" SmartScreen
       # warning and macOS needs a right-click-Open to bypass Gatekeeper,

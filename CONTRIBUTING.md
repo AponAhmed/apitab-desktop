@@ -14,6 +14,22 @@ npm run typecheck      # main/preload (node) + renderer (web) tsconfigs
 See the [README](README.md) for the full architecture overview, keyboard
 shortcuts, and packaging instructions.
 
+### Windows code signing (maintainers only)
+
+Windows installers are unsigned by default — `npm run dist:win` works with
+no setup and produces the same unsigned build CI has always published.
+Signing is opt-in via `scripts/windows-sign.mjs` (SSL.com CodeSignTool,
+cloud HSM — no `.pfx`, since no public CA has issued an exportable one for a
+new certificate since June 2023). To sign locally: download and unzip
+[CodeSignTool](https://www.ssl.com/download/codesigntool-for-windows/), then
+
+```bash
+CODESIGNTOOL_PATH=/path/to/CodeSignTool ES_USERNAME=... ES_PASSWORD=... ES_CREDENTIAL_ID=... ES_TOTP_SECRET=... npm run dist:win
+```
+
+Verify with `signtool verify /pa /v dist\apitab-desktop-*-setup.exe` or
+right-click the `.exe` → **Properties** → **Digital Signatures**.
+
 ## Before you open a pull request
 
 1. **Type-check.** `npm run typecheck` must pass with no errors.
