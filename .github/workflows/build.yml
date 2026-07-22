@@ -40,59 +40,6 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      # Windows code signing: no local cert of any kind (no public CA issues
-      # exportable .pfx certs anymore, and every paid cloud-signing option
-      # is out of scope here) — instead, the built installer is submitted to
-      # SignPath Foundation's free code-signing program for open-source
-      # projects (https://signpath.org, apply there first) as a separate
-      # post-build step. Inert without SIGNPATH_API_TOKEN, so this is a
-      # no-op — and every other matrix job — until that secret plus the
-      # three IDs below are actually filled in from the SignPath dashboard
-      # once the project is approved.
-      #
-      # Known limitations of this step as written: it only signs the outer
-      # NSIS installer exe (the artifact a user actually downloads and hits
-      # the Smart App Control block on) — the app exe extracted during
-      # install stays unsigned unless a second artifact is added to the
-      # SignPath project's artifact configuration. It also doesn't
-      # regenerate apitab-desktop-*.exe.blockmap after signing changes the
-      # file's bytes, so electron-updater's delta-update check for this
-      # release will fall back to a full download instead of a diff patch —
-      # not broken, just less efficient.
-      - name: Upload unsigned installer for signing
-        id: upload-unsigned-installer
-        # `secrets` can't be referenced directly in `if:` (GitHub Actions
-        # rejects the whole workflow file at validation time for it —
-        # "Unrecognized named-value: 'secrets'"); env.SIGNPATH_API_TOKEN,
-        # set on this step below, is the supported way to do this check.
-        if: matrix.os == 'windows-latest' && env.SIGNPATH_API_TOKEN != ''
-        env:
-          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-installer
-          path: dist/*-setup.exe
-          retention-days: 1
-
-      - name: Sign installer via SignPath
-        if: matrix.os == 'windows-latest' && env.SIGNPATH_API_TOKEN != ''
-        env:
-          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
-        uses: signpath/github-action-submit-signing-request@v2
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
-          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
-          github-artifact-id: ${{ steps.upload-unsigned-installer.outputs.artifact-id }}
-          wait-for-completion: true
-          # Unverified against a real SignPath project (no account exists to
-          # test against): confirm at https://docs.signpath.io whether this
-          # lands the signed .exe directly in dist/ or inside a nested zip
-          # that needs an extra extraction step before the upload-artifact
-          # step below picks it up.
-          output-artifact-directory: dist
-
       # Unsigned builds: Windows shows an "unknown publisher" SmartScreen
       # warning and macOS needs a right-click-Open to bypass Gatekeeper,
       # until a code-signing certificate is added to this workflow.
