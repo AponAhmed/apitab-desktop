@@ -27,12 +27,6 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  # No local signing config here — this build is unsigned. The Windows
-  # installer is instead signed as a separate post-build CI step (see
-  # build.yml) via SignPath Foundation's free open-source code signing
-  # program: https://signpath.org. It signs the already-built artifact
-  # remotely rather than plugging into electron-builder's own signtool.exe
-  # invocation, so there's nothing to configure on this side.
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

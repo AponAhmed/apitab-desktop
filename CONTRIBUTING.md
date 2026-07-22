@@ -14,16 +14,6 @@ npm run typecheck      # main/preload (node) + renderer (web) tsconfigs
 See the [README](README.md) for the full architecture overview, keyboard
 shortcuts, and packaging instructions.
 
-### Windows code signing (maintainers only)
-
-`npm run dist:win` always produces an unsigned installer locally — there's
-nothing to configure to build. The published release installer is signed in
-CI as a separate post-build step, free, via [SignPath Foundation's open-source
-program](https://signpath.org) (no public CA issues exportable `.pfx`
-certificates anymore, so this project doesn't use a traditional cert). See
-`.github/workflows/build.yml` for the signing step, gated on the
-`SIGNPATH_API_TOKEN` secret existing — it's a no-op without it.
-
 ## Before you open a pull request
 
 1. **Type-check.** `npm run typecheck` must pass with no errors.
