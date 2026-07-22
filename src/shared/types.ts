@@ -92,7 +92,13 @@ export interface AppApi {
 export type UpdateStatus =
   | { state: 'idle' }
   | { state: 'checking' }
-  | { state: 'available'; version: string }
+  // `downloadUrl` set means: don't attempt an in-app download/install for
+  // this update — macOS only. electron-updater's mac path delegates to
+  // Electron's native autoUpdater (Apple's Squirrel.Mac framework), which
+  // requires the running app to be code-signed to replace itself in place;
+  // this app isn't signed, so that always fails. `download()` opens this
+  // URL (the .dmg release asset) in the browser for a manual install instead.
+  | { state: 'available'; version: string; downloadUrl?: string }
   | { state: 'not-available' }
   | { state: 'downloading'; percent: number }
   | { state: 'downloaded'; version: string }

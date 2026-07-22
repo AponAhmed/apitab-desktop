@@ -29,17 +29,26 @@ export function UpdateStatusPanel() {
           <p className="text-xs text-slate-600 dark:text-slate-300">
             Update available: <span className="font-medium">v{status.version}</span>
           </p>
-          <Button
-            size="sm"
-            disabled={starting}
-            onClick={() => {
-              setStarting(true);
-              void download();
-            }}
-          >
-            <Download className="h-3.5 w-3.5" />
-            {starting ? 'Updating…' : 'Update Now'}
-          </Button>
+          {status.downloadUrl ? (
+            // macOS: no in-app install — see the comment on UpdateStatus in
+            // shared/types.ts for why. Opens the .dmg in the browser instead.
+            <Button size="sm" onClick={() => void download()}>
+              <Download className="h-3.5 w-3.5" />
+              Download Update
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              disabled={starting}
+              onClick={() => {
+                setStarting(true);
+                void download();
+              }}
+            >
+              <Download className="h-3.5 w-3.5" />
+              {starting ? 'Updating…' : 'Update Now'}
+            </Button>
+          )}
         </div>
       ) : status.state === 'downloading' ? (
         <div className="space-y-1.5">

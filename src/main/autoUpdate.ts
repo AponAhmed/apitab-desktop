@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import type { UpdateStatus } from '@shared/types';
 
@@ -12,8 +12,21 @@ function setStatus(next: UpdateStatus): void {
   for (const w of BrowserWindow.getAllWindows()) w.webContents.send('update:status', status);
 }
 
+// The release asset naming this repo has used for every dmg so far (see
+// electron-builder.yml's top-level `artifactName` and the mac target, which
+// builds a single universal x64+arm64 dmg — no per-arch filename needed).
+function macDownloadUrl(version: string): string {
+  return `https://github.com/AponAhmed/apitab-desktop/releases/download/v${version}/apitab-desktop-${version}.dmg`;
+}
+
 autoUpdater.on('checking-for-update', () => setStatus({ state: 'checking' }));
-autoUpdater.on('update-available', (info) => setStatus({ state: 'available', version: info.version }));
+autoUpdater.on('update-available', (info) =>
+  setStatus({
+    state: 'available',
+    version: info.version,
+    downloadUrl: process.platform === 'darwin' ? macDownloadUrl(info.version) : undefined,
+  }),
+);
 autoUpdater.on('update-not-available', () => setStatus({ state: 'not-available' }));
 autoUpdater.on('download-progress', (p) =>
   setStatus({ state: 'downloading', percent: Math.round(p.percent) }),
@@ -43,6 +56,10 @@ export function registerAutoUpdate(): void {
     autoUpdater.checkForUpdates().catch((err: Error) => setStatus({ state: 'error', message: err.message }));
   });
   ipcMain.handle('update:download', () => {
+    if (status.state === 'available' && status.downloadUrl) {
+      void shell.openExternal(status.downloadUrl);
+      return;
+    }
     autoUpdater
       .downloadUpdate()
       .catch((err: Error) => setStatus({ state: 'error', message: err.message }));
