@@ -61,7 +61,13 @@ jobs:
       # not broken, just less efficient.
       - name: Upload unsigned installer for signing
         id: upload-unsigned-installer
-        if: matrix.os == 'windows-latest' && secrets.SIGNPATH_API_TOKEN != ''
+        # `secrets` can't be referenced directly in `if:` (GitHub Actions
+        # rejects the whole workflow file at validation time for it —
+        # "Unrecognized named-value: 'secrets'"); env.SIGNPATH_API_TOKEN,
+        # set on this step below, is the supported way to do this check.
+        if: matrix.os == 'windows-latest' && env.SIGNPATH_API_TOKEN != ''
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-installer
@@ -69,7 +75,9 @@ jobs:
           retention-days: 1
 
       - name: Sign installer via SignPath
-        if: matrix.os == 'windows-latest' && secrets.SIGNPATH_API_TOKEN != ''
+        if: matrix.os == 'windows-latest' && env.SIGNPATH_API_TOKEN != ''
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
