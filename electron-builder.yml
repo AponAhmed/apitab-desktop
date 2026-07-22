@@ -9,7 +9,6 @@ artifactName: ${name}-${version}.${ext}
 files:
   - '!**/.vscode/*'
   - '!src/*'
-  - '!scripts/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json,yarn.lock}'
@@ -28,14 +27,12 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  # Code signing via scripts/windows-sign.mjs (SSL.com CodeSignTool, cloud
-  # HSM — see that file for why: no public CA has issued an exportable .pfx,
-  # which CSC_LINK requires, for any new certificate since June 2023). The
-  # hook no-ops without ES_USERNAME set, so this build stays unsigned exactly
-  # as before until real credentials are configured (locally or in CI).
-  signtoolOptions:
-    signingHashAlgorithms: [sha256]
-    sign: ./scripts/windows-sign.mjs
+  # No local signing config here — this build is unsigned. The Windows
+  # installer is instead signed as a separate post-build CI step (see
+  # build.yml) via SignPath Foundation's free open-source code signing
+  # program: https://signpath.org. It signs the already-built artifact
+  # remotely rather than plugging into electron-builder's own signtool.exe
+  # invocation, so there's nothing to configure on this side.
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
