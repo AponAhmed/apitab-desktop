@@ -16,19 +16,13 @@ shortcuts, and packaging instructions.
 
 ### Windows code signing (maintainers only)
 
-Windows installers are unsigned by default — `npm run dist:win` works with
-no setup and produces the same unsigned build CI has always published.
-Signing is opt-in via `scripts/windows-sign.mjs` (SSL.com CodeSignTool,
-cloud HSM — no `.pfx`, since no public CA has issued an exportable one for a
-new certificate since June 2023). To sign locally: download and unzip
-[CodeSignTool](https://www.ssl.com/download/codesigntool-for-windows/), then
-
-```bash
-CODESIGNTOOL_PATH=/path/to/CodeSignTool ES_USERNAME=... ES_PASSWORD=... ES_CREDENTIAL_ID=... ES_TOTP_SECRET=... npm run dist:win
-```
-
-Verify with `signtool verify /pa /v dist\apitab-desktop-*-setup.exe` or
-right-click the `.exe` → **Properties** → **Digital Signatures**.
+`npm run dist:win` always produces an unsigned installer locally — there's
+nothing to configure to build. The published release installer is signed in
+CI as a separate post-build step, free, via [SignPath Foundation's open-source
+program](https://signpath.org) (no public CA issues exportable `.pfx`
+certificates anymore, so this project doesn't use a traditional cert). See
+`.github/workflows/build.yml` for the signing step, gated on the
+`SIGNPATH_API_TOKEN` secret existing — it's a no-op without it.
 
 ## Before you open a pull request
 
