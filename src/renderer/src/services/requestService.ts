@@ -1,5 +1,6 @@
 import { resolveString, type VariableMap } from '@/utils/variables';
 import { applyPathVariables, splitUrl, urlWithParams } from '@/utils/query';
+import { stripJsonComments } from '@/utils/json';
 import { sendExecuteRequest, type WireRequest } from './messaging';
 import type {
   ApiRequest,
@@ -67,7 +68,11 @@ export function prepareRequest(request: ApiRequest, vars: VariableMap = {}): Pre
   if (allowsBody) {
     switch (request.body.type) {
       case 'json': {
-        body = resolveString(request.body.json, vars);
+        // `//` line comments are a body-editor-only convenience (see
+        // utils/json.ts) — stripped here so what's actually sent (and
+        // shown in generated cURL/code snippets, which both go through
+        // this same prepareRequest) is always spec-compliant JSON.
+        body = stripJsonComments(resolveString(request.body.json, vars));
         if (body && !hasHeader(headers, 'content-type')) {
           headers.push({ key: 'Content-Type', value: 'application/json' });
         }

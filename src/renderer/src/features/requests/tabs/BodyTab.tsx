@@ -42,7 +42,7 @@ function JsonBody() {
       <Textarea
         value={json}
         onChange={(e) => setJsonBody(e.target.value)}
-        placeholder={'{\n  "name": "Ada",\n  "active": true\n}'}
+        placeholder={'{\n  // comments are supported\n  "name": "Ada",\n  "active": true\n}'}
         className={cn(
           'min-h-[220px] flex-1',
           json.trim() !== '' && !validation.valid && 'border-red-400 focus:border-red-400 focus:ring-red-400/25',
