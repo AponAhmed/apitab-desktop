@@ -5,9 +5,17 @@ function classifyError(err: unknown): ApiError {
     return { type: 'timeout', message: 'Request timed out.' };
   }
   if (err instanceof TypeError) {
+    // Node's fetch (undici) wraps the real reason in `.cause` — usually a
+    // system error with a `.code` (ECONNRESET, ECONNREFUSED, CERT_*, etc.).
+    // Surfacing it is the difference between a dead end and an actionable
+    // error; the generic fallback only fires when Node gives us nothing.
+    const cause = (err as { cause?: { code?: string; message?: string } }).cause;
+    const detail = cause?.code ?? cause?.message ?? (err.message !== 'fetch failed' ? err.message : undefined);
     return {
       type: 'network',
-      message: 'Network error — the host may be unreachable or the DNS lookup failed.',
+      message: detail
+        ? `Network error: ${detail}`
+        : 'Network error — the host may be unreachable or the DNS lookup failed.',
     };
   }
   return { type: 'unknown', message: (err as Error)?.message ?? 'Unknown error' };
