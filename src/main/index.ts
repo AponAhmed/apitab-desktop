@@ -1,4 +1,5 @@
 import { join } from 'path';
+import dns from 'node:dns';
 import { app, shell, BrowserWindow, ipcMain } from 'electron';
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { executeRequest } from './requestHandler';
@@ -6,6 +7,16 @@ import { storageClear, storageGet, storageRemove, storageSet } from './store';
 import { registerAutoUpdate } from './autoUpdate';
 import type { PreparedRequest } from '@shared/types';
 import icon from '../../resources/icon.png?asset';
+
+// Node resolves "localhost" to its /etc/hosts order, which on macOS is
+// typically IPv6 (::1) first. If the target only listens on IPv4 — e.g. a
+// Docker Desktop port-forward, which on Mac's networking stack doesn't
+// always bind the IPv6 loopback the way it does on Windows/WSL2 — undici's
+// fetch fails outright instead of falling back, even though curl/Chromium
+// (which both do proper IPv4/IPv6 happy-eyeballs) reach the same URL fine.
+// This makes every request in this process prefer IPv4 first, matching what
+// browsers already do.
+dns.setDefaultResultOrder('ipv4first');
 
 // Works around a known Electron/Windows bug where opening a native <select>
 // dropdown (e.g. Auth Type) can leave the GPU compositor rendering the

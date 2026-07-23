@@ -11,9 +11,11 @@ interface ModalProps {
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
+  /** Skips the backdrop blur — for a modal where staying able to read content behind it (e.g. the collection tree) matters more than the usual focus effect. */
+  noBackdropBlur?: boolean;
 }
 
-export function Modal({ open, onClose, title, children, footer, className }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, className, noBackdropBlur }: ModalProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -27,7 +29,10 @@ export function Modal({ open, onClose, title, children, footer, className }: Mod
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4 backdrop-blur-sm"
+      className={cn(
+        'fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4',
+        !noBackdropBlur && 'backdrop-blur-sm',
+      )}
       onMouseDown={onClose}
     >
       <div

@@ -14,6 +14,7 @@ interface TeamState {
 
   setTeams: (teams: Team[]) => void;
   setActiveTeam: (id: string | null) => void;
+  removeTeamFromStore: (teamId: string) => void;
   renameTeamInStore: (teamId: string, name: string) => void;
   setMembers: (teamId: string, members: TeamMember[]) => void;
   addMemberToStore: (teamId: string, member: TeamMember) => void;
@@ -46,6 +47,17 @@ export const useTeamStore = create<TeamState>()(
           activeTeamId: s.activeTeamId && teams.some((t) => t.id === s.activeTeamId) ? s.activeTeamId : null,
         })),
       setActiveTeam: (activeTeamId) => set({ activeTeamId }),
+      removeTeamFromStore: (teamId) =>
+        set((s) => {
+          const { [teamId]: _members, ...members } = s.members;
+          const { [teamId]: _lastSyncedAt, ...lastSyncedAt } = s.lastSyncedAt;
+          return {
+            teams: s.teams.filter((t) => t.id !== teamId),
+            activeTeamId: s.activeTeamId === teamId ? null : s.activeTeamId,
+            members,
+            lastSyncedAt,
+          };
+        }),
       renameTeamInStore: (teamId, name) =>
         set((s) => ({ teams: s.teams.map((t) => (t.id === teamId ? { ...t, name } : t)) })),
       setMembers: (teamId, teamMembers) =>
