@@ -13,6 +13,19 @@ import icon from '../../resources/icon.png?asset';
 // a driver/compositor state issue rather than app state.
 app.disableHardwareAcceleration();
 
+// On some Windows machines (older/buggy GPU drivers, restrictive sandboxing,
+// certain hybrid-graphics laptops) Chromium's separate GPU process fails to
+// initialize and the app never gets past a blank window — the only reliable
+// fix users have found is launching with `--in-process-gpu` by hand, which
+// folds GPU work into the main process instead of spawning it separately.
+// Baking the same switch in here means it doesn't have to be typed manually
+// every launch. disableHardwareAcceleration() above isn't enough on its own:
+// it stops GPU compositing, but a separate GPU process can still be spawned
+// (and still crash on init) for other GPU-related work.
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('in-process-gpu');
+}
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1280,
