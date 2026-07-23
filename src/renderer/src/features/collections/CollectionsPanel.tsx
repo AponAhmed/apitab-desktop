@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Copy,
   Download,
+  FilePlus2,
   Folder,
   FolderPlus,
   Pencil,
@@ -36,12 +37,36 @@ import { countRequests, isCollection } from '@/utils/collectionTree';
 import { exportContainer, parseCollectionExport, sanitizeFilename } from '@/utils/collectionIO';
 import { parsePostmanFile } from '@/utils/postmanImport';
 import { downloadJson, readFileAsText } from '@/services/backup';
+import { createRequest } from '@/utils/defaults';
 import type { ApiRequest, Collection, Container, TeamRole } from '@/types';
+
+/**
+ * What's currently being dragged. Tracked in React state (via context)
+ * rather than read back from `dataTransfer` during dragover, because
+ * Firefox only allows `dataTransfer.getData()` in the `drop` handler itself
+ * — reading it during `dragenter`/`dragover` silently returns an empty
+ * string there, which would break the live drop-zone highlighting in
+ * Firefox specifically. `dataTransfer.setData` is still called on
+ * dragstart (some browsers expect *something* set for the drag to visually
+ * initiate), it's just never read back.
+ */
+interface DragPayload {
+  kind: 'collection' | 'folder' | 'request';
+  id: string;
+}
+const DRAG_MIME = 'application/x-apitab-drag';
+
+const DragContext = createContext<{
+  dragging: DragPayload | null;
+  setDragging: (p: DragPayload | null) => void;
+} | null>(null);
+const useDrag = () => useContext(DragContext)!;
 
 interface CollectionActions {
   activeRequestId: string | null;
   openRequest: (containerId: string, req: ApiRequest) => void;
   newFolder: (parentId: string) => void;
+  newRequest: (parentId: string) => void;
   rename: (container: Container) => void;
   duplicate: (id: string) => void;
   removeContainer: (container: Container) => void;
@@ -51,6 +76,9 @@ interface CollectionActions {
   deleteRequest: (req: ApiRequest) => void;
   shareToTeam: (collectionId: string) => void;
   unshare: (container: Container) => void;
+  moveFolder: (folderId: string, targetContainerId: string, referenceId?: string, position?: 'before' | 'after') => void;
+  moveRequest: (requestId: string, targetContainerId: string, referenceId?: string, position?: 'before' | 'after') => void;
+  reorderCollections: (collectionId: string, referenceId: string, position: 'before' | 'after') => void;
 }
 
 const ActionsContext = createContext<CollectionActions | null>(null);
@@ -68,8 +96,10 @@ function RequestNode({
   depth: number;
 }) {
   const actions = useActions();
+  const { dragging, setDragging } = useDrag();
   const active = actions.activeRequestId === request.id;
   const isDirty = useRequestStore((s) => s.isDirty);
+  const [dropZone, setDropZone] = useState<'before' | 'after' | null>(null);
   const items: MenuItem[] = [
     { label: 'Duplicate', icon: Copy, onClick: () => actions.duplicateRequest(request.id) },
     { label: 'Delete', icon: Trash2, danger: true, onClick: () => actions.deleteRequest(request) },
@@ -77,15 +107,45 @@ function RequestNode({
 
   return (
     <div
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData(DRAG_MIME, request.id);
+        setDragging({ kind: 'request', id: request.id });
+      }}
+      onDragEnd={() => setDragging(null)}
+      onDragOver={(e) => {
+        // Only another request can be positioned relative to this one — a
+        // folder dropped here has no "before/after a request" position in
+        // this data model (folders and requests are separate arrays, always
+        // rendered folders-first); see the folder/collection drop handlers
+        // for where a dragged folder actually lands instead.
+        if (dragging?.kind !== 'request' || dragging.id === request.id) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const rect = e.currentTarget.getBoundingClientRect();
+        setDropZone(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after');
+      }}
+      onDragLeave={() => setDropZone(null)}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const zone = dropZone;
+        setDropZone(null);
+        if (dragging?.kind !== 'request' || dragging.id === request.id || !zone) return;
+        actions.moveRequest(dragging.id, containerId, request.id, zone);
+      }}
       onClick={() => actions.openRequest(containerId, request)}
       style={{ paddingLeft: depth * INDENT + 6 }}
       className={cn(
-        'group flex cursor-pointer items-center gap-1.5 rounded-md py-0.5 pr-1 hover:bg-slate-100 dark:hover:bg-slate-800/70',
+        'group relative flex cursor-pointer items-center gap-1.5 rounded-md py-0.5 pr-1 hover:bg-slate-100 dark:hover:bg-slate-800/70',
         active && 'bg-brand-100 dark:bg-brand-900/40',
+        dropZone === 'before' && 'shadow-[inset_0_2px_0_0_var(--tw-shadow-color)] shadow-brand-500',
+        dropZone === 'after' && 'shadow-[inset_0_-2px_0_0_var(--tw-shadow-color)] shadow-brand-500',
       )}
     >
-      <span className="w-9 shrink-0 text-right">
-        <MethodBadge method={request.method} className="text-[10px]" />
+      <span className="w-10 shrink-0 text-left">
+        <MethodBadge method={request.method} className="text-[9px]!" />
       </span>
       <span className="min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-300">
         {request.name || request.url || 'Untitled'}
@@ -111,6 +171,7 @@ function ContainerNode({
   toggle,
   role,
   currentUserId,
+  parentId,
 }: {
   container: Container;
   depth: number;
@@ -119,8 +180,12 @@ function ContainerNode({
   /** This device's role on the owning team, when `container` is a shared root collection. */
   role?: TeamRole;
   currentUserId?: string | null;
+  /** This container's own parent container id — undefined for a root collection (top-level, not nested in anything). Needed so a folder dropped in this row's before/after zone knows which container to reorder within. */
+  parentId?: string;
 }) {
   const actions = useActions();
+  const { dragging, setDragging } = useDrag();
+  const [dropZone, setDropZone] = useState<'before' | 'after' | 'into' | null>(null);
   const root = isCollection(container);
   const teamId = root ? (container as Collection).teamId : undefined;
   const createdBy = root ? (container as Collection).createdBy : undefined;
@@ -131,6 +196,7 @@ function ContainerNode({
 
   const items: MenuItem[] = [
     { label: 'New folder', icon: FolderPlus, onClick: () => actions.newFolder(container.id) },
+    { label: 'New request', icon: FilePlus2, onClick: () => actions.newRequest(container.id) },
     { label: 'Rename', icon: Pencil, onClick: () => actions.rename(container) },
     { label: 'Duplicate', icon: Copy, onClick: () => actions.duplicate(container.id) },
     { label: 'Export', icon: Download, separatorBefore: true, onClick: () => actions.exportItem(container) },
@@ -156,8 +222,69 @@ function ContainerNode({
   return (
     <div>
       <div
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData(DRAG_MIME, container.id);
+          setDragging({ kind: root ? 'collection' : 'folder', id: container.id });
+        }}
+        onDragEnd={() => setDragging(null)}
+        onDragOver={(e) => {
+          if (!dragging || dragging.id === container.id) return;
+          if (dragging.kind === 'collection') {
+            // Collections only reorder among each other — a folder row can't receive one.
+            if (!root) return;
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            const rect = e.currentTarget.getBoundingClientRect();
+            setDropZone(e.clientY < rect.top + rect.height / 2 ? 'before' : 'after');
+          } else if (dragging.kind === 'folder') {
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            if (root) {
+              // A folder dropped on a collection row always means "file it
+              // directly under this collection" — collections aren't a
+              // folder's siblings at any level, so before/after has no
+              // meaning here.
+              setDropZone('into');
+            } else {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const relY = (e.clientY - rect.top) / rect.height;
+              setDropZone(relY < 0.25 ? 'before' : relY > 0.75 ? 'after' : 'into');
+            }
+          } else {
+            // Dragging a request: this row is a whole-row "file it in here" target.
+            e.preventDefault();
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move';
+            setDropZone('into');
+          }
+        }}
+        onDragLeave={() => setDropZone(null)}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const zone = dropZone;
+          setDropZone(null);
+          if (!dragging || dragging.id === container.id || !zone) return;
+          if (dragging.kind === 'collection') {
+            if (root && zone !== 'into') actions.reorderCollections(dragging.id, container.id, zone);
+          } else if (dragging.kind === 'folder') {
+            if (zone === 'into') actions.moveFolder(dragging.id, container.id);
+            else if (parentId) actions.moveFolder(dragging.id, parentId, container.id, zone);
+          } else if (dragging.kind === 'request' && zone === 'into') {
+            actions.moveRequest(dragging.id, container.id);
+          }
+        }}
         style={{ paddingLeft: depth * INDENT + 4 }}
-        className="group flex items-center gap-1 rounded-md py-0.5 pr-1 hover:bg-slate-100 dark:hover:bg-slate-800/70"
+        className={cn(
+          'group flex items-center gap-1 rounded-md py-0.5 pr-1 hover:bg-slate-100 dark:hover:bg-slate-800/70',
+          dropZone === 'into' && 'bg-brand-100 dark:bg-brand-900/40',
+          dropZone === 'before' && 'shadow-[inset_0_2px_0_0_var(--tw-shadow-color)] shadow-brand-500',
+          dropZone === 'after' && 'shadow-[inset_0_-2px_0_0_var(--tw-shadow-color)] shadow-brand-500',
+        )}
       >
         <button
           onClick={() => toggle(container.id)}
@@ -199,7 +326,14 @@ function ContainerNode({
       {!isCollapsed && (
         <div>
           {container.folders.map((f) => (
-            <ContainerNode key={f.id} container={f} depth={depth + 1} collapsed={collapsed} toggle={toggle} />
+            <ContainerNode
+              key={f.id}
+              container={f}
+              depth={depth + 1}
+              collapsed={collapsed}
+              toggle={toggle}
+              parentId={container.id}
+            />
           ))}
           {container.requests.map((r) => (
             <RequestNode key={r.id} request={r} containerId={container.id} depth={depth + 1} />
@@ -276,6 +410,7 @@ export function CollectionsPanel() {
   const collections = useCollectionStore((s) => s.collections);
   const createCollection = useCollectionStore((s) => s.createCollection);
   const createFolder = useCollectionStore((s) => s.createFolder);
+  const addRequest = useCollectionStore((s) => s.addRequest);
   const renameContainer = useCollectionStore((s) => s.renameContainer);
   const deleteContainer = useCollectionStore((s) => s.deleteContainer);
   const duplicateContainer = useCollectionStore((s) => s.duplicateContainer);
@@ -283,6 +418,10 @@ export function CollectionsPanel() {
   const deleteRequest = useCollectionStore((s) => s.deleteRequest);
   const importAsCollection = useCollectionStore((s) => s.importAsCollection);
   const importIntoContainer = useCollectionStore((s) => s.importIntoContainer);
+  const moveFolder = useCollectionStore((s) => s.moveFolder);
+  const moveRequest = useCollectionStore((s) => s.moveRequest);
+  const reorderCollections = useCollectionStore((s) => s.reorderCollections);
+  const [dragging, setDragging] = useState<DragPayload | null>(null);
 
   const loadRequest = useRequestStore((s) => s.loadRequest);
   const activeRequestId = useRequestStore((s) => s.savedRef?.requestId ?? null);
@@ -350,6 +489,10 @@ export function CollectionsPanel() {
     activeRequestId,
     openRequest: (containerId, req) => loadRequest(req, { containerId, requestId: req.id }),
     newFolder: (parentId) => setFolderParent(parentId),
+    newRequest: (parentId) => {
+      const created = addRequest(parentId, createRequest(), 'Untitled Request');
+      if (created) loadRequest(created, { containerId: parentId, requestId: created.id });
+    },
     rename: (c) => setRenameTarget({ id: c.id, name: c.name }),
     duplicate: (id) => duplicateContainer(id),
     removeContainer: (c) => setDeleteTarget({ id: c.id, name: c.name, kind: 'container' }),
@@ -376,6 +519,9 @@ export function CollectionsPanel() {
     duplicateRequest,
     deleteRequest: (req) => setDeleteTarget({ id: req.id, name: req.name, kind: 'request' }),
     shareToTeam: (collectionId) => openShareToTeam(collectionId),
+    moveFolder,
+    moveRequest,
+    reorderCollections,
   };
 
   const importCollectionExport = (data: NonNullable<ReturnType<typeof parseCollectionExport>['data']>) => {
@@ -469,6 +615,7 @@ export function CollectionsPanel() {
           />
         ) : (
           <ActionsContext.Provider value={actions}>
+          <DragContext.Provider value={{ dragging, setDragging }}>
             {visibleGroups.map((group) => (
               <div key={group.key} className="mb-3">
                 <div
@@ -523,6 +670,7 @@ export function CollectionsPanel() {
                 </div>
               </div>
             ))}
+          </DragContext.Provider>
           </ActionsContext.Provider>
         )}
       </div>

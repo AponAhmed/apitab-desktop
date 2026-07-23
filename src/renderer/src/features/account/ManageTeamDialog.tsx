@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useTeamStore } from '@/stores/teamStore';
 import { useAccountStore } from '@/stores/accountStore';
+import { useCollectionStore } from '@/stores/collectionStore';
 import { apiClient, ApiError } from '@/services/apiClient';
 import { toast } from '@/stores/toastStore';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +21,8 @@ export function ManageTeamDialog({ open, onClose }: { open: boolean; onClose: ()
   const addMemberToStore = useTeamStore((s) => s.addMemberToStore);
   const removeMemberFromStore = useTeamStore((s) => s.removeMemberFromStore);
   const renameTeamInStore = useTeamStore((s) => s.renameTeamInStore);
+  const removeTeamFromStore = useTeamStore((s) => s.removeTeamFromStore);
+  const removeCollectionsForTeam = useCollectionStore((s) => s.removeCollectionsForTeam);
   const currentUserId = useAccountStore((s) => s.session?.user.id ?? null);
 
   const team = teams.find((t) => t.id === activeTeamId);
@@ -35,6 +38,7 @@ export function ManageTeamDialog({ open, onClose }: { open: boolean; onClose: ()
   const [nameDraft, setNameDraft] = useState('');
   const [renaming, setRenaming] = useState(false);
   const [summary, setSummary] = useState<{ createdAt?: number; collectionsCount: number } | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   /** Mirrors TeamPolicy::removeMember server-side: never the owner; owner removes anyone else; admin removes plain members only. */
   const canRemove = (m: TeamMember) =>
@@ -100,6 +104,19 @@ export function ManageTeamDialog({ open, onClose }: { open: boolean; onClose: ()
       toast.error(err instanceof ApiError ? err.message : 'Failed to add member');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!activeTeamId) return;
+    try {
+      await apiClient.deleteTeam(activeTeamId);
+      removeCollectionsForTeam(activeTeamId);
+      removeTeamFromStore(activeTeamId);
+      toast.success('Workspace deleted');
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Failed to delete workspace');
     }
   };
 
@@ -223,6 +240,19 @@ export function ManageTeamDialog({ open, onClose }: { open: boolean; onClose: ()
             )}
           </div>
         </div>
+
+        {myRole === 'owner' && (
+          <div className="rounded-md border border-red-200 p-3 dark:border-red-900/50">
+            <h4 className="mb-1 text-sm font-medium text-red-700 dark:text-red-400">Danger zone</h4>
+            <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+              Permanently deletes this workspace, its shared collections, and removes access for
+              every member. This can't be undone.
+            </p>
+            <Button variant="danger" size="sm" onClick={() => setDeleteConfirmOpen(true)}>
+              Delete workspace
+            </Button>
+          </div>
+        )}
       </div>
 
       <ConfirmDialog
@@ -237,6 +267,20 @@ export function ManageTeamDialog({ open, onClose }: { open: boolean; onClose: ()
         confirmLabel="Remove"
         onConfirm={() => void handleRemove()}
         onClose={() => setRemoveTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Delete workspace"
+        message={
+          <>
+            Permanently delete <b>{team.name}</b>? Every member loses access, and all of this
+            workspace's shared collections are deleted for everyone. This can't be undone.
+          </>
+        }
+        confirmLabel="Delete workspace"
+        onConfirm={() => void handleDelete()}
+        onClose={() => setDeleteConfirmOpen(false)}
       />
     </Modal>
   );

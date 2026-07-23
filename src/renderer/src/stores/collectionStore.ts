@@ -4,6 +4,9 @@ import { cloneRequest } from '@/utils/defaults';
 import { uuid } from '@/utils/id';
 import {
   cloneFolderWithNewIds,
+  containsContainer,
+  extractFolder,
+  extractRequest,
   findContainer,
   findOwnerCollection,
   findParentOfFolder,
@@ -32,6 +35,27 @@ interface CollectionState {
   updateRequest: (request: ApiRequest) => void;
   duplicateRequest: (requestId: string) => void;
   deleteRequest: (requestId: string) => void;
+  /**
+   * Moves a folder to be a child of `targetContainerId`, positioned relative
+   * to `referenceId` (another folder already in that container) — before or
+   * after it. Omitting `referenceId` appends at the end. No-ops if that
+   * would nest the folder inside itself or one of its own descendants.
+   */
+  moveFolder: (
+    folderId: string,
+    targetContainerId: string,
+    referenceId?: string,
+    position?: 'before' | 'after',
+  ) => void;
+  /** Same as `moveFolder`, but for a request — `referenceId` is another request already in the target container. */
+  moveRequest: (
+    requestId: string,
+    targetContainerId: string,
+    referenceId?: string,
+    position?: 'before' | 'after',
+  ) => void;
+  /** Reorders top-level collections relative to `referenceId` (before/after). */
+  reorderCollections: (collectionId: string, referenceId: string, position: 'before' | 'after') => void;
   importAsCollection: (data: CollectionExport) => Collection;
   importIntoContainer: (containerId: string, data: CollectionExport) => void;
   replaceAll: (collections: Collection[]) => void;
@@ -53,6 +77,8 @@ interface CollectionState {
    * them, and could briefly act on stale/foreign data in the meantime.
    */
   clearTeamCollections: () => void;
+  /** Drops local collections tagged to one specific team (e.g. after that team/workspace is deleted). */
+  removeCollectionsForTeam: (teamId: string) => void;
 }
 
 function bump(collections: Collection[], id: string) {
@@ -149,6 +175,58 @@ export const useCollectionStore = create<CollectionState>()(
         return saved;
       },
 
+      moveFolder: (folderId, targetContainerId, referenceId, position) =>
+        set((s) => {
+          if (folderId === targetContainerId) return s;
+          const next = structuredClone(s.collections);
+          const folder = extractFolder(next, folderId);
+          if (!folder) return s;
+          // Would nest the folder inside itself or one of its own
+          // descendants — bail without committing (folder was only ever
+          // extracted from `next`, a clone, so the real state is untouched).
+          if (containsContainer(folder, targetContainerId)) return s;
+          const target = findContainer(next, targetContainerId);
+          if (!target) return s;
+          let index = target.folders.length;
+          if (referenceId) {
+            const refIndex = target.folders.findIndex((f) => f.id === referenceId);
+            if (refIndex !== -1) index = position === 'after' ? refIndex + 1 : refIndex;
+          }
+          target.folders.splice(index, 0, folder);
+          bump(next, targetContainerId);
+          return { collections: next };
+        }),
+
+      moveRequest: (requestId, targetContainerId, referenceId, position) =>
+        set((s) => {
+          const next = structuredClone(s.collections);
+          const request = extractRequest(next, requestId);
+          if (!request) return s;
+          const target = findContainer(next, targetContainerId);
+          if (!target) return s;
+          let index = target.requests.length;
+          if (referenceId) {
+            const refIndex = target.requests.findIndex((r) => r.id === referenceId);
+            if (refIndex !== -1) index = position === 'after' ? refIndex + 1 : refIndex;
+          }
+          target.requests.splice(index, 0, request);
+          bump(next, targetContainerId);
+          return { collections: next };
+        }),
+
+      reorderCollections: (collectionId, referenceId, position) =>
+        set((s) => {
+          if (collectionId === referenceId) return s;
+          const next = [...s.collections];
+          const fromIndex = next.findIndex((c) => c.id === collectionId);
+          if (fromIndex === -1) return s;
+          const [item] = next.splice(fromIndex, 1);
+          let index = next.findIndex((c) => c.id === referenceId);
+          index = index === -1 ? next.length : position === 'after' ? index + 1 : index;
+          next.splice(index, 0, item);
+          return { collections: next };
+        }),
+
       updateRequest: (request) =>
         set((s) => {
           const next = structuredClone(s.collections);
@@ -236,6 +314,9 @@ export const useCollectionStore = create<CollectionState>()(
 
       clearTeamCollections: () =>
         set((s) => ({ collections: s.collections.filter((c) => !c.teamId) })),
+
+      removeCollectionsForTeam: (teamId) =>
+        set((s) => ({ collections: s.collections.filter((c) => c.teamId !== teamId) })),
     }),
     {
       name: 'apitab:collections',

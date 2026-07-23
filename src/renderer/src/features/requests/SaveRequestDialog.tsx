@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useCollectionStore } from '@/stores/collectionStore';
 import { useRequestStore } from '@/stores/requestStore';
+import { useTeamStore } from '@/stores/teamStore';
 import { useDialogStore } from '@/stores/dialogStore';
 import { toast } from '@/stores/toastStore';
 import { Modal } from '@/components/ui/Modal';
@@ -18,8 +19,17 @@ export function SaveRequestDialog() {
   const createCollection = useCollectionStore((s) => s.createCollection);
   const saveToCollection = useRequestStore((s) => s.saveToCollection);
   const requestName = useRequestStore((s) => s.request.name);
+  const activeTeamId = useTeamStore((s) => s.activeTeamId);
 
-  const targets = useMemo(() => flattenContainers(collections), [collections]);
+  // Only the currently selected workspace's collections — matches the same
+  // scoping CollectionsPanel's sidebar already applies, so "Save to" never
+  // offers a collection you can't actually see without switching workspace
+  // first (which would make the saved request seem to vanish).
+  const workspaceCollections = useMemo(
+    () => collections.filter((c) => (activeTeamId ? c.teamId === activeTeamId : !c.teamId)),
+    [collections, activeTeamId],
+  );
+  const targets = useMemo(() => flattenContainers(workspaceCollections), [workspaceCollections]);
 
   const [name, setName] = useState('');
   const [target, setTarget] = useState<string>(NEW);
@@ -48,6 +58,7 @@ export function SaveRequestDialog() {
       open={open}
       onClose={close}
       title="Save Request"
+      noBackdropBlur
       footer={
         <>
           <Button variant="ghost" onClick={close}>

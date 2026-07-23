@@ -10,7 +10,7 @@ export function MethodBadge({
   className?: string;
 }) {
   return (
-    <span className={cn('font-mono text-[11px] font-bold tracking-wide', methodColor(method), className)}>
+    <span className={cn('font-mono text-[11px] font-medium tracking-wide', methodColor(method), className)}>
       {method}
     </span>
   );

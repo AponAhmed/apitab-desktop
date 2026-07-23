@@ -126,9 +126,46 @@ function findRequestIn(container: Container, requestId: string): RequestLocation
 export function findOwnerCollection(collections: Collection[], id: string): Collection | null {
   return collections.find((c) => containsContainer(c, id)) ?? null;
 }
-function containsContainer(container: Container, id: string): boolean {
+/** True if `id` is `container` itself or lives anywhere in its folder subtree — used to reject dropping a folder into itself or one of its own descendants. */
+export function containsContainer(container: Container, id: string): boolean {
   if (container.id === id) return true;
   return container.folders.some((f) => containsContainer(f, id));
+}
+
+/** Finds and removes a folder from anywhere in the tree, returning it (or null if not found). */
+export function extractFolder(collections: Collection[], folderId: string): CollectionFolder | null {
+  for (const c of collections) {
+    const found = extractFolderIn(c, folderId);
+    if (found) return found;
+  }
+  return null;
+}
+function extractFolderIn(container: Container, folderId: string): CollectionFolder | null {
+  const i = container.folders.findIndex((f) => f.id === folderId);
+  if (i !== -1) return container.folders.splice(i, 1)[0];
+  for (const f of container.folders) {
+    const found = extractFolderIn(f, folderId);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Finds and removes a request from anywhere in the tree, returning it (or null if not found). */
+export function extractRequest(collections: Collection[], requestId: string): ApiRequest | null {
+  for (const c of collections) {
+    const found = extractRequestIn(c, requestId);
+    if (found) return found;
+  }
+  return null;
+}
+function extractRequestIn(container: Container, requestId: string): ApiRequest | null {
+  const i = container.requests.findIndex((r) => r.id === requestId);
+  if (i !== -1) return container.requests.splice(i, 1)[0];
+  for (const f of container.folders) {
+    const found = extractRequestIn(f, requestId);
+    if (found) return found;
+  }
+  return null;
 }
 
 /** Deep-clones a folder subtree, assigning fresh ids to folders and requests. */

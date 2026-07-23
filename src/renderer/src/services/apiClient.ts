@@ -133,6 +133,8 @@ export const apiClient = {
   updateTeam: (teamId: string, name: string) =>
     request<{ id: string; name: string; ownerId: string }>('PUT', `/teams/${teamId}`, { name }),
 
+  deleteTeam: (teamId: string) => request<{ message: string }>('DELETE', `/teams/${teamId}`),
+
   fetchTeamCollections: (teamId: string) =>
     request<{ collections: Collection[] }>('GET', `/teams/${teamId}/collections`),
 
