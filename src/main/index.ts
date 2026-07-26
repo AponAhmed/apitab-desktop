@@ -43,9 +43,17 @@ function createWindow(): void {
     height: 800,
     show: false,
     autoHideMenuBar: true,
-    // No native title bar on any platform — TopBar.tsx is the drag region
-    // and owns minimize/maximize/close via the custom WindowControls below.
-    frame: false,
+    // TopBar.tsx is the drag region and (on Windows/Linux) owns
+    // minimize/maximize/close via the custom WindowControls component. On
+    // macOS we instead keep the OS's own traffic-light buttons — hiding the
+    // rest of the native title bar with `titleBarStyle: 'hidden'` rather
+    // than going fully frameless, since a hand-drawn approximation never
+    // quite matches real macOS hover/click/spacing behavior the way the
+    // genuine buttons do. WindowControls.tsx checks the platform and
+    // renders nothing on macOS to avoid a second, redundant set of controls.
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hidden' as const, trafficLightPosition: { x: 12, y: 15 } }
+      : { frame: false }),
     // Sets the taskbar/title-bar icon during `npm run dev` and on Linux
     // (which doesn't embed an icon into the executable the way
     // electron-builder does for Windows/.ico and macOS/.icns).
@@ -58,7 +66,23 @@ function createWindow(): void {
     },
   });
 
-  mainWindow.on('ready-to-show', () => mainWindow.show());
+  mainWindow.on('ready-to-show', () => {
+    mainWindow.show();
+
+    // Chromium doesn't always register -webkit-app-region:drag hit-test
+    // regions (TopBar.tsx) on the very first compositor frame — especially
+    // with hardware acceleration disabled above — so dragging the frameless
+    // title bar silently no-ops until some later, unrelated layout pass
+    // happens to recompute it (in practice: a couple of seconds after
+    // launch). Nudging the window size by 1px and back forces an immediate
+    // recompute instead of waiting on that.
+    setTimeout(() => {
+      if (mainWindow.isDestroyed()) return;
+      const [w, h] = mainWindow.getSize();
+      mainWindow.setSize(w + 1, h);
+      mainWindow.setSize(w, h);
+    }, 100);
+  });
 
   // Lets WindowControls.tsx keep its maximize/restore icon in sync with
   // state changes that don't originate from its own button (double-clicking

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Info, Monitor, Moon, PanelLeft, Settings, Sun } from 'lucide-react';
+import { cn } from '@/utils/cn';
 import { useUiStore } from '@/stores/uiStore';
 import { useDialogStore } from '@/stores/dialogStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -44,20 +45,25 @@ export function TopBar() {
   const openSettings = useDialogStore((s) => s.openSettings);
   const [aboutOpen, setAboutOpen] = useState(false);
   const { toggleMaximize } = useWindowControls();
+  const isMac = window.api.platform === 'darwin';
 
   return (
-    // The drag region for moving the window (frame: false — see main/index.ts).
-    // Every interactive child below opts back out with no-drag, since a drag
+    // The drag region for moving the window (frame: false on Windows/Linux,
+    // titleBarStyle: 'hidden' on macOS — see main/index.ts). Every
+    // interactive child below opts back out with no-drag, since a drag
     // region swallows clicks on anything inside it. Double-click-to-maximize
     // is native title-bar behavior a frameless window doesn't get for free.
     <header
       className="flex h-11 shrink-0 items-stretch border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0f111a] [-webkit-app-region:drag]"
       style={{
-        backgroundImage: 'linear-gradient(311deg, rgb(255 255 255 / 3%) 0%, rgb(255 232 179 / 30%) 100%)',
+        backgroundImage: 'linear-gradient(311deg, rgba(255, 255, 255, 0.03) 0%, rgb(149 149 149 / 27%) 100%)',
       }}
       onDoubleClick={toggleMaximize}
     >
-      <div className="flex flex-1 items-center gap-1.5 px-2.5">
+      {/* Reserves room for macOS's native traffic-light buttons (top-left,
+          set via trafficLightPosition in main/index.ts) so the sidebar
+          toggle/logo don't sit underneath them. */}
+      <div className={cn('flex flex-1 items-center gap-1.5 pr-2.5', isMac ? 'pl-20' : 'pl-2.5')}>
         <div className="[-webkit-app-region:no-drag]">
           <IconButton size="sm" title="Toggle sidebar" aria-label="Toggle sidebar" onClick={toggleSidebar}>
             <PanelLeft className="h-4 w-4" />

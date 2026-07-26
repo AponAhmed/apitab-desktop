@@ -19,6 +19,11 @@ import type {
  * Node, or Electron internals.
  */
 const api = {
+  // Read synchronously (no IPC round-trip) so the renderer's very first
+  // render already knows the platform — WindowControls.tsx needs this
+  // before paint to decide whether to draw its own buttons at all (macOS
+  // gets real native traffic lights instead, see main/index.ts).
+  platform: process.platform,
   request: {
     send: (req: PreparedRequest): Promise<RequestResult> => ipcRenderer.invoke('request:send', req),
   },
