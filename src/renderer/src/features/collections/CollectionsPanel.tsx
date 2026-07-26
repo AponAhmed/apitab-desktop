@@ -8,6 +8,7 @@ import {
   Folder,
   FolderPlus,
   Pencil,
+  Plus,
   Search,
   Trash2,
   Upload,
@@ -318,7 +319,18 @@ function ContainerNode({
           )}
           <span className="shrink-0 text-[10px] text-slate-400">{countRequests(container)}</span>
         </button>
-        <div className="opacity-0 group-hover:opacity-100">
+        <div className="flex items-center opacity-0 group-hover:opacity-100">
+          <IconButton
+            size="sm"
+            title="New request"
+            aria-label="New request"
+            onClick={(e) => {
+              e.stopPropagation();
+              actions.newRequest(container.id);
+            }}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </IconButton>
           <Menu items={items} label={root ? 'Collection actions' : 'Folder actions'} />
         </div>
       </div>
