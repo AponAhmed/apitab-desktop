@@ -96,6 +96,7 @@ function SectionHeader({ title, description }: { title: string; description?: st
 export function OptionsPage({ onClose }: { onClose?: () => void }) {
   useApplyTheme();
   const [section, setSection] = useState<SectionId>('general');
+  const isMac = window.api.platform === 'darwin';
 
   const [version, setVersion] = useState('');
   useEffect(() => {
@@ -169,7 +170,13 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
   return (
     <div className="flex h-screen bg-white text-slate-800 dark:bg-[#0f111a] dark:text-slate-200">
       <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 dark:border-slate-800">
-        <div className="flex items-center gap-2.5 px-5 py-5">
+        {/* On macOS the native traffic-light buttons (main/index.ts's
+            trafficLightPosition) sit at a fixed window-level position —
+            they aren't part of this page's DOM, so nothing here naturally
+            avoids them the way TopBar.tsx's own layout does. This overlay
+            covers TopBar entirely, so without extra top padding here the
+            traffic lights render directly over the logo/title below. */}
+        <div className={cn('flex items-center gap-2.5 px-5 py-5', isMac && 'pt-11')}>
           <Logo className="h-8 w-8" />
           <div className="min-w-0">
             <h1 className="text-sm font-bold leading-tight text-slate-900 dark:text-slate-100">
