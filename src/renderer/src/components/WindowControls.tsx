@@ -5,9 +5,17 @@ import { cn } from '@/utils/cn';
 const BASE =
   'inline-grid h-11 w-11 place-items-center text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus:outline-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200';
 
-/** Custom minimize/maximize/close controls — the window is `frame: false` (main/index.ts), so there's no native title bar to supply these. Must sit outside TopBar's drag region. */
+/**
+ * Custom minimize/maximize/close controls for Windows/Linux, where the
+ * window is frameless (main/index.ts) with no native title bar to supply
+ * these. macOS keeps its own real traffic-light buttons instead (set up via
+ * `titleBarStyle: 'hidden'` in main/index.ts) — rendering nothing here
+ * avoids a second, redundant set of controls.
+ */
 export function WindowControls() {
   const { isMaximized, minimize, toggleMaximize, close } = useWindowControls();
+
+  if (window.api.platform === 'darwin') return null;
 
   return (
     <div className="flex h-full items-stretch [-webkit-app-region:no-drag]">
