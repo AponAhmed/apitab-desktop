@@ -23,7 +23,7 @@ export const REPO_URL = 'https://github.com/AponAhmed/apitab-desktop';
 export const SIBLING_REPO_URL = 'https://github.com/AponAhmed/apitab';
 
 export const ABOUT = {
-  tagline: 'Lightweight, local-first API testing — a fast, minimal alternative to Postman.',
+  tagline: 'Lightweight, local-first API testing — a fast, minimal API client.',
   repoUrl: REPO_URL,
 
   developer: {

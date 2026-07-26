@@ -1,6 +1,6 @@
 # ApiTab Desktop
 
-> Lightweight, local‑first API testing desktop app — a fast, minimal alternative to Postman.
+> Lightweight, local‑first API testing desktop app — a fast, minimal API client.
 
 ApiTab Desktop is the native Electron counterpart to the [ApiTab browser extension](https://github.com/AponAhmed/apitab): the same request builder, collections, environments, and scripting sandbox, packaged as a standalone Windows/macOS/Linux app with **no browser required and no CORS restrictions** on the requests you send.
 

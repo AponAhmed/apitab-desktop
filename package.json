@@ -1,7 +1,7 @@
 {
   "name": "apitab-desktop",
   "productName": "ApiTab",
-  "description": "Lightweight, local-first API testing desktop app — a fast, minimal alternative to Postman.",
+  "description": "Lightweight, local-first API testing desktop app — a fast, minimal API client.",
   "version": "1.4.13",
   "author": {
     "name": "Muhiminul Haque (Apon)",
