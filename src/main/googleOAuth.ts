@@ -3,11 +3,20 @@ import crypto from 'node:crypto';
 import { shell } from 'electron';
 import type { GoogleOAuthResult } from '@shared/types';
 
-// Public per Google's own native-app guidance — installed-app client IDs
-// aren't treated as confidential. The matching client_secret stays
-// server-side only (apitab-server does the code→token exchange), so it's
-// never embedded here.
-const GOOGLE_DESKTOP_CLIENT_ID = '405992136210-5i73a1kpt456s14croh49p0dsp1etf2h.apps.googleusercontent.com';
+// Public per Google's own native-app guidance — client IDs aren't treated
+// as confidential. The matching client_secret stays server-side only
+// (apitab-server does the code→token exchange), so it's never embedded here.
+// This is a single "Web application" OAuth client shared with both browser
+// extensions (each registers its own redirect URI on the same client) —
+// which is why the loopback server below binds a fixed port rather than an
+// OS-assigned one: a Web application client requires an exact, pre-registered
+// redirect URI (no Desktop-app-style "any port" matching).
+// TODO: replace with the new unified "Web application" OAuth client's id
+// once created in Google Cloud Console (Authorized redirect URIs must
+// include http://localhost:51739/, https://kppdfdbhgmaifadkadbedgigdhhijljc.chromiumapp.org/,
+// and the Firefox loopback URI once that hash is known).
+const GOOGLE_CLIENT_ID = '405992136210-5i73a1kpt456s14croh49p0dsp1etf2h.apps.googleusercontent.com';
+const LOOPBACK_PORT = 51739;
 
 function base64url(input: Buffer): string {
   return input.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -65,15 +74,19 @@ export async function runGoogleOAuthLoopback(): Promise<GoogleOAuthResult> {
     );
     server.on('close', () => clearTimeout(timeout));
 
-    server.on('error', reject);
+    server.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE') {
+        reject(new Error(`Port ${LOOPBACK_PORT} is already in use by another app — close it and try again.`));
+        return;
+      }
+      reject(err);
+    });
 
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      const port = typeof address === 'object' && address ? address.port : 0;
-      redirectUri = `http://localhost:${port}`;
+    server.listen(LOOPBACK_PORT, '127.0.0.1', () => {
+      redirectUri = `http://localhost:${LOOPBACK_PORT}`;
 
       const authorizeUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-      authorizeUrl.searchParams.set('client_id', GOOGLE_DESKTOP_CLIENT_ID);
+      authorizeUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID);
       authorizeUrl.searchParams.set('redirect_uri', redirectUri);
       authorizeUrl.searchParams.set('response_type', 'code');
       authorizeUrl.searchParams.set('scope', 'openid email profile');
