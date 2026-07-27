@@ -29,6 +29,17 @@ export interface KeyValue {
   enabled: boolean;
   /** Free-text note — not sent with the request, purely documentation for the row. */
   description?: string;
+  /**
+   * Form-data rows only: whether `value` is plain text or the row instead
+   * references a chosen file. The actual `File` object is never persisted
+   * (browsers can't serialize it, and re-picking it every session is the
+   * only sane option anyway) — it lives only in the in-memory
+   * `stores/fileStore.ts`, keyed by this row's `id`. Absent/'text' for
+   * every other use of KeyValue (params, headers, form-urlencoded).
+   */
+  valueType?: 'text' | 'file';
+  /** Display name of the chosen file, for `valueType: 'file'` rows. */
+  fileName?: string;
 }
 
 export type AuthType = 'none' | 'bearer' | 'basic' | 'apikey';
@@ -62,7 +73,7 @@ export interface RequestScripts {
   postResponse: string;
 }
 
-export type BodyType = 'none' | 'json' | 'raw' | 'form-urlencoded' | 'form-data';
+export type BodyType = 'none' | 'json' | 'raw' | 'form-urlencoded' | 'form-data' | 'binary';
 
 export interface RequestBody {
   type: BodyType;
@@ -72,6 +83,12 @@ export interface RequestBody {
   raw: string;
   formUrlEncoded: KeyValue[];
   formData: KeyValue[];
+  /**
+   * Display name of the chosen file for the 'binary' body type. Like
+   * form-data file rows, the actual bytes live only in the in-memory
+   * `stores/fileStore.ts` (keyed by `binary:${request.id}`), never persisted.
+   */
+  binaryFileName?: string;
 }
 
 /** A complete API request — used both as the live draft and when saved. */

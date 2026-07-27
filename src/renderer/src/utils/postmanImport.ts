@@ -43,9 +43,10 @@ interface PostmanBody {
   mode?: 'raw' | 'urlencoded' | 'formdata' | 'graphql' | 'file';
   raw?: string;
   urlencoded?: { key?: string; value?: string; disabled?: boolean; description?: string }[];
-  formdata?: { key?: string; value?: string; type?: string; disabled?: boolean; description?: string }[];
+  formdata?: { key?: string; value?: string; src?: string; type?: string; disabled?: boolean; description?: string }[];
   graphql?: { query?: string; variables?: string };
   options?: { raw?: { language?: string } };
+  file?: { src?: string };
 }
 
 interface PostmanAuthParam {
@@ -190,17 +191,26 @@ function convertBody(body: PostmanBody | undefined): RequestBody {
     case 'formdata':
       result.type = 'form-data';
       result.formData = [
-        // File fields have no local file to attach — imported as an empty
-        // text field the user can refill, rather than silently dropped.
+        // File fields have no local file to attach (browsers can't read an
+        // arbitrary exported path) — imported in file mode with the
+        // original filename as a hint, so the user only has to re-pick it.
         ...(body.formdata ?? [])
           .filter((f) => f.key)
           .map((f) =>
-            emptyKeyValue({
-              key: f.key ?? '',
-              value: f.type === 'file' ? '' : (f.value ?? ''),
-              enabled: !f.disabled,
-              description: f.description ?? '',
-            }),
+            f.type === 'file'
+              ? emptyKeyValue({
+                  key: f.key ?? '',
+                  valueType: 'file',
+                  fileName: (f.src ?? f.value ?? '').split(/[/\\]/).pop() || undefined,
+                  enabled: !f.disabled,
+                  description: f.description ?? '',
+                })
+              : emptyKeyValue({
+                  key: f.key ?? '',
+                  value: f.value ?? '',
+                  enabled: !f.disabled,
+                  description: f.description ?? '',
+                }),
           ),
         emptyKeyValue(),
       ];
@@ -214,7 +224,11 @@ function convertBody(body: PostmanBody | undefined): RequestBody {
       );
       break;
     case 'file':
-      // No local file reference survives export — leave the body empty.
+      // No local file reference survives export — imported in binary mode
+      // with the original filename as a hint, so the user only has to
+      // re-pick it, rather than silently leaving the body empty.
+      result.type = 'binary';
+      result.binaryFileName = (body.file?.src ?? '').split(/[/\\]/).pop() || undefined;
       break;
   }
   return result;

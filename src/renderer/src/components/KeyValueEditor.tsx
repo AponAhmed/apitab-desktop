@@ -1,10 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState, type FocusEvent } from 'react';
-import { Trash2, Share2 } from 'lucide-react';
+import { Trash2, Share2, Paperclip, Type, X } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Toggle } from './ui/Toggle';
 import { IconButton } from './ui/IconButton';
 import { VariableInput } from './VariableInput';
 import { SuggestionDropdown } from './SuggestionDropdown';
+import { useFileStore, formDataFileKey } from '@/stores/fileStore';
 import type { KeyValue } from '@/types';
 
 interface KeyValueEditorProps {
@@ -41,6 +42,13 @@ interface KeyValueEditorProps {
   hideRemove?: boolean;
   /** Adds a free-text "Description" column per row (Params, Headers, form bodies) — not sent with the request. */
   showNotes?: boolean;
+  /**
+   * Form Data only: lets each row's value be a chosen file instead of text
+   * (adds a small text/file mode toggle per row). The `File` itself is kept
+   * in `stores/fileStore.ts` (keyed by the row's id), never in this
+   * persisted `rows` list — only `valueType`/`fileName` are.
+   */
+  allowFileValues?: boolean;
 }
 
 const inputClass =
@@ -143,6 +151,52 @@ function ExpandableValueCell({
   );
 }
 
+/** Value cell for a form-data row in file mode: a filename picker instead of free text. */
+function FileValueCell({
+  fileName,
+  dim,
+  onPick,
+  onClear,
+}: {
+  fileName?: string;
+  dim: boolean;
+  onPick: (file: File) => void;
+  onClear: () => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  return (
+    <div
+      className={cn(
+        'flex h-8 items-center gap-1 border-l border-slate-200 px-2 dark:border-slate-800',
+        dim && 'opacity-50',
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => fileRef.current?.click()}
+        className="min-w-0 flex-1 truncate text-left font-mono text-sm text-slate-600 hover:text-brand-600 dark:text-slate-300 dark:hover:text-brand-400"
+      >
+        {fileName || 'Choose file…'}
+      </button>
+      {fileName && (
+        <IconButton size="sm" onClick={onClear} aria-label="Remove file">
+          <X className="h-3.5 w-3.5" />
+        </IconButton>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onPick(file);
+          e.target.value = '';
+        }}
+      />
+    </div>
+  );
+}
+
 function Cell({
   value,
   onChange,
@@ -207,12 +261,14 @@ export function KeyValueEditor({
   readOnlyKeys = false,
   hideRemove = false,
   showNotes = false,
+  allowFileValues = false,
 }: KeyValueEditorProps) {
   const keyListId = useId();
   const shareCol = showShareToggle ? ' 2rem' : '';
   const removeCol = hideRemove ? '' : ' 2.25rem';
   const notesCol = showNotes ? ' 1fr' : '';
-  const gridTemplateColumns = `2.25rem ${columnRatio[0]} ${columnRatio[1]}${notesCol}${shareCol}${removeCol}`;
+  const fileToggleCol = allowFileValues ? ' 2rem' : '';
+  const gridTemplateColumns = `2.25rem ${columnRatio[0]} ${columnRatio[1]}${fileToggleCol}${notesCol}${shareCol}${removeCol}`;
 
   return (
     <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
@@ -224,6 +280,7 @@ export function KeyValueEditor({
           <span />
           <span className="px-2">{keyPlaceholder}</span>
           <span className="px-2 border-l border-slate-200 dark:border-slate-800">{valuePlaceholder}</span>
+          {allowFileValues && <span />}
           <span className="px-2 border-l border-slate-200 dark:border-slate-800">Description</span>
         </div>
       )}
@@ -235,7 +292,11 @@ export function KeyValueEditor({
         </datalist>
       )}
       {rows.map((row, i) => {
-        const isTrailing = i === rows.length - 1 && row.key === '' && row.value === '';
+        // A row switched to file mode counts as "filled in" even before a
+        // key is typed or a file is actually chosen — otherwise it'd stay
+        // indistinguishable from the perpetual blank trailing row (dimmed,
+        // no remove button, no fresh row appended below it once used).
+        const isTrailing = i === rows.length - 1 && row.key === '' && row.value === '' && row.valueType !== 'file';
         const dim = !row.enabled && !isTrailing;
         const shared = sharedIds?.has(row.id) ?? false;
         const rowValueSuggestions = valueSuggestionsForKey?.(row.key) ?? valueSuggestions;
@@ -275,14 +336,48 @@ export function KeyValueEditor({
                 enableVariables={enableVariables}
               />
             )}
-            <ExpandableValueCell
-              value={row.value}
-              onChange={(v) => onChange(row.id, { value: v })}
-              placeholder={valuePlaceholder}
-              suggestions={rowValueSuggestions}
-              dim={dim}
-              enableVariables={enableVariables}
-            />
+            {allowFileValues && row.valueType === 'file' ? (
+              <FileValueCell
+                fileName={row.fileName}
+                dim={dim}
+                onPick={(file) => {
+                  useFileStore.getState().setFile(formDataFileKey(row.id), file);
+                  onChange(row.id, { fileName: file.name, value: '' });
+                }}
+                onClear={() => {
+                  useFileStore.getState().removeFile(formDataFileKey(row.id));
+                  onChange(row.id, { fileName: undefined });
+                }}
+              />
+            ) : (
+              <ExpandableValueCell
+                value={row.value}
+                onChange={(v) => onChange(row.id, { value: v })}
+                placeholder={valuePlaceholder}
+                suggestions={rowValueSuggestions}
+                dim={dim}
+                enableVariables={enableVariables}
+              />
+            )}
+            {allowFileValues && (
+              <div className="grid place-items-center">
+                <IconButton
+                  size="sm"
+                  onClick={() => {
+                    if (row.valueType === 'file') {
+                      useFileStore.getState().removeFile(formDataFileKey(row.id));
+                      onChange(row.id, { valueType: 'text', fileName: undefined });
+                    } else {
+                      onChange(row.id, { valueType: 'file', value: '' });
+                    }
+                  }}
+                  aria-label={row.valueType === 'file' ? 'Switch to text value' : 'Switch to file value'}
+                  title={row.valueType === 'file' ? 'Switch to text value' : 'Switch to file value'}
+                >
+                  {row.valueType === 'file' ? <Type className="h-3.5 w-3.5" /> : <Paperclip className="h-3.5 w-3.5" />}
+                </IconButton>
+              </div>
+            )}
             {showNotes && (
               <input
                 value={row.description ?? ''}

@@ -62,7 +62,11 @@ function fetchSnippet(req: PreparedRequest): string {
   if (req.bodyType === 'form-data' && req.formData?.length) {
     const appends = req.formData
       .filter((f) => f.key)
-      .map((f) => `formdata.append(${jsString(f.key)}, ${jsString(f.value)});`);
+      .map((f) =>
+        f.valueType === 'file'
+          ? `formdata.append(${jsString(f.key)}, /* replace with a real File, e.g. from an <input type="file"> */ ${jsString(f.fileName ?? 'file')});`
+          : `formdata.append(${jsString(f.key)}, ${jsString(f.value)});`,
+      );
     prelude = `const formdata = new FormData();\n${appends.join('\n')}\n\n`;
     bodyRef = 'formdata';
   } else if (req.bodyType === 'form-urlencoded') {
@@ -71,6 +75,8 @@ function fetchSnippet(req: PreparedRequest): string {
     );
     prelude = `const urlencoded = new URLSearchParams();\n${appends.join('\n')}\n\n`;
     bodyRef = 'urlencoded';
+  } else if (req.bodyType === 'binary') {
+    bodyRef = `/* replace with a real File, e.g. from an <input type="file"> */ ${jsString(req.binaryFileName ?? 'file')}`;
   } else if (req.body) {
     bodyRef = jsString(req.body);
   }
@@ -99,12 +105,20 @@ function axiosSnippet(req: PreparedRequest): string {
   let prelude = `const axios = require('axios');\n\n`;
   let dataRef: string | null = null;
   let extraHeaders = '';
+  const usesFile =
+    (req.bodyType === 'form-data' && req.formData?.some((f) => f.valueType === 'file')) ||
+    req.bodyType === 'binary';
+  if (usesFile) prelude += `const fs = require('fs');\n`;
 
   if (req.bodyType === 'form-data' && req.formData?.length) {
     prelude += `const FormData = require('form-data');\n`;
     const appends = req.formData
       .filter((f) => f.key)
-      .map((f) => `data.append(${jsString(f.key)}, ${jsString(f.value)});`);
+      .map((f) =>
+        f.valueType === 'file'
+          ? `data.append(${jsString(f.key)}, fs.createReadStream(${jsString(f.fileName ?? 'file')}));`
+          : `data.append(${jsString(f.key)}, ${jsString(f.value)});`,
+      );
     prelude += `const data = new FormData();\n${appends.join('\n')}\n\n`;
     dataRef = 'data';
     extraHeaders = '\n    ...data.getHeaders(),';
@@ -113,6 +127,9 @@ function axiosSnippet(req: PreparedRequest): string {
       ([k, v]) => `data.append(${jsString(k)}, ${jsString(v)});`,
     );
     prelude += `const data = new URLSearchParams();\n${appends.join('\n')}\n\n`;
+    dataRef = 'data';
+  } else if (req.bodyType === 'binary') {
+    prelude += `const data = fs.createReadStream(${jsString(req.binaryFileName ?? 'file')});\n\n`;
     dataRef = 'data';
   } else if (req.body) {
     prelude += `const data = ${jsString(req.body)};\n\n`;
@@ -153,8 +170,14 @@ function phpCurlSnippet(req: PreparedRequest): string {
   if (req.bodyType === 'form-data' && req.formData?.length) {
     const fields = req.formData
       .filter((f) => f.key)
-      .map((f) => `    ${phpString(f.key)} => ${phpString(f.value)},`);
+      .map((f) =>
+        f.valueType === 'file'
+          ? `    ${phpString(f.key)} => new CURLFile(${phpString(f.fileName ?? 'file')}),`
+          : `    ${phpString(f.key)} => ${phpString(f.value)},`,
+      );
     opts.push(`  CURLOPT_POSTFIELDS => [\n${fields.join('\n')}\n  ],`);
+  } else if (req.bodyType === 'binary') {
+    opts.push(`  CURLOPT_POSTFIELDS => file_get_contents(${phpString(req.binaryFileName ?? 'file')}),`);
   } else if (req.body) {
     opts.push(`  CURLOPT_POSTFIELDS => ${phpString(req.body)},`);
   }
@@ -195,7 +218,11 @@ function laravelSnippet(req: PreparedRequest): string {
   if (req.bodyType === 'form-data' && req.formData?.length) {
     const attaches = req.formData
       .filter((f) => f.key)
-      .map((f) => `attach(${phpString(f.key)}, ${phpString(f.value)})`)
+      .map((f) =>
+        f.valueType === 'file'
+          ? `attach(${phpString(f.key)}, file_get_contents(${phpString(f.fileName ?? 'file')}), ${phpString(f.fileName ?? 'file')})`
+          : `attach(${phpString(f.key)}, ${phpString(f.value)})`,
+      )
       .join('\n    ->');
     call = `${attaches}\n    ->${method}(${phpString(req.url)})`;
   } else if (req.bodyType === 'form-urlencoded') {
@@ -203,6 +230,8 @@ function laravelSnippet(req: PreparedRequest): string {
       ([k, v]) => `    ${phpString(k)} => ${phpString(v)},`,
     );
     call = `asForm()->${method}(${phpString(req.url)}, [\n${fields.join('\n')}\n])`;
+  } else if (req.bodyType === 'binary') {
+    call = `withBody(file_get_contents(${phpString(req.binaryFileName ?? 'file')}), mime_content_type(${phpString(req.binaryFileName ?? 'file')}))\n    ->${method}(${phpString(req.url)})`;
   } else if (req.body) {
     const ct = headerEntries(req).find(([k]) => k.toLowerCase() === 'content-type');
     const contentType = ct?.[1] ?? 'application/json';
@@ -230,7 +259,11 @@ function pythonSnippet(req: PreparedRequest): string {
   if (req.bodyType === 'form-data' && req.formData?.length) {
     const fields = req.formData
       .filter((f) => f.key)
-      .map((f) => `  ${pyString(f.key)}: (None, ${pyString(f.value)}),`);
+      .map((f) =>
+        f.valueType === 'file'
+          ? `  ${pyString(f.key)}: open(${pyString(f.fileName ?? 'file')}, 'rb'),`
+          : `  ${pyString(f.key)}: (None, ${pyString(f.value)}),`,
+      );
     lines.push(`files = {\n${fields.join('\n')}\n}`);
     lines.push('');
     bodyKwarg = ', files=files';
@@ -239,6 +272,10 @@ function pythonSnippet(req: PreparedRequest): string {
       ([k, v]) => `  ${pyString(k)}: ${pyString(v)},`,
     );
     lines.push(`payload = {\n${fields.join('\n')}\n}`);
+    lines.push('');
+    bodyKwarg = ', data=payload';
+  } else if (req.bodyType === 'binary') {
+    lines.push(`payload = open(${pyString(req.binaryFileName ?? 'file')}, 'rb')`);
     lines.push('');
     bodyKwarg = ', data=payload';
   } else if (req.body) {

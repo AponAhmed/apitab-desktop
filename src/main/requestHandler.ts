@@ -56,10 +56,22 @@ export async function executeRequest(req: PreparedRequest): Promise<RequestResul
     if (methodAllowsBody) {
       if (req.bodyType === 'form-data' && req.formData?.length) {
         const fd = new FormData();
-        for (const f of req.formData) if (f.key) fd.append(f.key, f.value);
+        for (const f of req.formData) {
+          if (!f.key) continue;
+          if (f.fileData) {
+            fd.append(f.key, new Blob([Buffer.from(f.fileData, 'base64')], { type: f.fileType || 'application/octet-stream' }), f.fileName || 'file');
+          } else {
+            fd.append(f.key, f.value);
+          }
+        }
         body = fd;
         // Let fetch set the multipart boundary.
         headers.delete('content-type');
+      } else if (req.bodyType === 'binary' && req.binary) {
+        // A Blob body's own `type` becomes the Content-Type header
+        // automatically per the fetch spec, but only when the caller hasn't
+        // already set one — an explicit header (set below) still wins.
+        body = new Blob([Buffer.from(req.binary.fileData, 'base64')], { type: req.binary.fileType || 'application/octet-stream' });
       } else if (req.body) {
         body = req.body;
       }

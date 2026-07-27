@@ -42,8 +42,15 @@ export function buildCurl(req: PreparedRequest, options: BuildCurlOptions = {}):
   if (req.bodyType === 'form-data' && req.formData?.length) {
     for (const f of req.formData) {
       if (!f.key) continue;
-      parts.push(`-F ${shellQuote(`${f.key}=${f.value}`)}`);
+      // Browsers never expose a file's full filesystem path (security), so
+      // `@filename` is the best we can export — correct as-is if the named
+      // file is in the directory this command is run from, otherwise the
+      // path needs adjusting by hand.
+      const value = f.valueType === 'file' ? `@${f.fileName ?? ''}` : f.value;
+      parts.push(`-F ${shellQuote(`${f.key}=${value}`)}`);
     }
+  } else if (req.bodyType === 'binary') {
+    parts.push(`--data-binary ${shellQuote(`@${req.binaryFileName ?? 'file'}`)}`);
   } else if (req.body) {
     parts.push(`--data ${shellQuote(req.body)}`);
   }
@@ -248,8 +255,18 @@ export function parseCurl(input: string): ParseCurlResult {
         const [val, ni] = takeValue(tokens, i, attached);
         const idx = val.indexOf('=');
         const key = idx === -1 ? val : val.slice(0, idx);
-        const value = idx === -1 ? '' : val.slice(idx + 1);
-        formFields.push(emptyKeyValue({ key, value }));
+        const rawValue = idx === -1 ? '' : val.slice(idx + 1);
+        // cURL's own file-upload syntax (`-F key=@path`, optionally
+        // `;type=...`/`;filename=...` suffixes — only the path is kept).
+        // We can't read an arbitrary local path from here, so this imports
+        // as a file-mode row with no bytes attached yet; the user re-picks
+        // the actual file afterward (its name is preserved as a hint).
+        if (rawValue.startsWith('@')) {
+          const fileName = rawValue.slice(1).split(';')[0].split('/').pop() || rawValue.slice(1);
+          formFields.push(emptyKeyValue({ key, valueType: 'file', fileName }));
+        } else {
+          formFields.push(emptyKeyValue({ key, value: rawValue }));
+        }
         i = ni;
         break;
       }

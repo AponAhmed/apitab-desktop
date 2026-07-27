@@ -13,11 +13,28 @@
  * a fully-prepared request.
  */
 
-export type BodyType = 'none' | 'json' | 'raw' | 'form-urlencoded' | 'form-data';
+export type BodyType = 'none' | 'json' | 'raw' | 'form-urlencoded' | 'form-data' | 'binary';
 
 export interface PreparedFormField {
   key: string;
   value: string;
+  fileName?: string;
+  fileType?: string;
+  /**
+   * Base64-encoded file bytes (see utils/binary.ts). Deliberately not a raw
+   * `ArrayBuffer` — the extension's equivalent message-passing path was
+   * found to silently mangle ArrayBuffer into an empty object despite
+   * looking structured-clone-safe, so both clients use the same
+   * guaranteed-safe base64 wire format for consistency.
+   */
+  fileData?: string;
+}
+
+export interface PreparedFile {
+  fileName: string;
+  fileType: string;
+  /** Base64-encoded file bytes — see PreparedFormField.fileData. */
+  fileData: string;
 }
 
 /** A fully-resolved HTTP request, ready to execute — sent renderer → main. */
@@ -31,6 +48,8 @@ export interface PreparedRequest {
   body: string | null;
   /** Field list for multipart form-data bodies. */
   formData?: PreparedFormField[];
+  /** Whole-body file for the 'binary' body type. */
+  binary?: PreparedFile;
   timeoutMs: number;
 }
 

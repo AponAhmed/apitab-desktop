@@ -1,8 +1,10 @@
-import { AlertCircle, CheckCircle2, Wand2 } from 'lucide-react';
+import { useRef } from 'react';
+import { AlertCircle, CheckCircle2, Paperclip, Wand2, X } from 'lucide-react';
 import { useRequestStore } from '@/stores/requestStore';
 import { KeyValueEditor } from '@/components/KeyValueEditor';
 import { Textarea } from '@/components/ui/Textarea';
 import { Button } from '@/components/ui/Button';
+import { IconButton } from '@/components/ui/IconButton';
 import { cn } from '@/utils/cn';
 import { validateJson } from '@/utils/json';
 import { METHODS_WITH_BODY, type BodyType } from '@/types';
@@ -13,6 +15,7 @@ const BODY_TYPES: { id: BodyType; label: string }[] = [
   { id: 'raw', label: 'Raw' },
   { id: 'form-urlencoded', label: 'Form URL Encoded' },
   { id: 'form-data', label: 'Form Data' },
+  { id: 'binary', label: 'Binary' },
 ];
 
 function JsonBody() {
@@ -79,7 +82,57 @@ function FormDataBody() {
   const rows = useRequestStore((s) => s.request.body.formData);
   const update = useRequestStore((s) => s.updateFormData);
   const remove = useRequestStore((s) => s.removeFormData);
-  return <KeyValueEditor rows={rows} onChange={update} onRemove={remove} keyPlaceholder="Field" showNotes />;
+  return (
+    <KeyValueEditor
+      rows={rows}
+      onChange={update}
+      onRemove={remove}
+      keyPlaceholder="Field"
+      showNotes
+      allowFileValues
+    />
+  );
+}
+
+function BinaryBody() {
+  const fileName = useRequestStore((s) => s.request.body.binaryFileName);
+  const setBinaryFile = useRequestStore((s) => s.setBinaryFile);
+  const clearBinaryFile = useRequestStore((s) => s.clearBinaryFile);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="flex flex-col gap-2">
+      {!fileName ? (
+        <Button variant="outline" onClick={() => fileRef.current?.click()} className="self-start">
+          <Paperclip className="h-4 w-4" />
+          Choose file
+        </Button>
+      ) : (
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700">
+          <span className="min-w-0 flex-1 truncate font-mono text-sm text-slate-700 dark:text-slate-200">
+            {fileName}
+          </span>
+          <IconButton size="sm" onClick={clearBinaryFile} aria-label="Remove file">
+            <X className="h-4 w-4" />
+          </IconButton>
+        </div>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) setBinaryFile(file);
+          e.target.value = '';
+        }}
+      />
+      <p className="text-xs text-slate-400">
+        The file's raw bytes are sent as the entire request body — its type is used as the
+        Content-Type header unless you set one explicitly.
+      </p>
+    </div>
+  );
 }
 
 export function BodyTab() {
@@ -122,6 +175,7 @@ export function BodyTab() {
         {type === 'raw' && <RawBody />}
         {type === 'form-urlencoded' && <FormUrlEncodedBody />}
         {type === 'form-data' && <FormDataBody />}
+        {type === 'binary' && <BinaryBody />}
       </div>
     </div>
   );

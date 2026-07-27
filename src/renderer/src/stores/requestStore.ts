@@ -8,6 +8,7 @@ import { executeRequest, prepareRequest } from '@/services/requestService';
 import { runScript } from '@/services/scriptRunner';
 import { parseCurl, type ParseCurlResult } from '@/utils/curl';
 import { browserLocalStorage } from './persist';
+import { binaryFileKey, useFileStore } from './fileStore';
 import { useEnvironmentStore } from './environmentStore';
 import { useSettingsStore } from './settingsStore';
 import { useHistoryStore } from './historyStore';
@@ -68,7 +69,12 @@ function sanitizeKeyValue(kv: KeyValue): KeyValue {
 function withTrailingRow(rows: KeyValue[]): KeyValue[] {
   const sanitized = rows.map(sanitizeKeyValue);
   const last = sanitized[sanitized.length - 1];
-  if (!last || last.key !== '' || last.value !== '') return [...sanitized, emptyKeyValue()];
+  // A form-data row switched to file mode counts as "filled in" even with
+  // an empty key/value — otherwise it'd never get a fresh blank row below
+  // it to keep filling in (see KeyValueEditor.tsx's matching isTrailing check).
+  if (!last || last.key !== '' || last.value !== '' || last.valueType === 'file') {
+    return [...sanitized, emptyKeyValue()];
+  }
   return sanitized;
 }
 
@@ -189,6 +195,9 @@ interface RequestState {
   setJsonBody: (json: string) => void;
   setRawBody: (raw: string) => void;
   formatJsonBody: () => void;
+  /** Sets the whole-body file for the 'binary' body type — the File itself goes to the (unpersisted) file store, only its name is kept in the persisted request. */
+  setBinaryFile: (file: File) => void;
+  clearBinaryFile: () => void;
 
   // Scripts
   setPreRequestScript: (code: string) => void;
@@ -299,6 +308,14 @@ export const useRequestStore = create<RequestState>()(
             const result = formatJson(r.body.json);
             return result.ok ? { ...r, body: { ...r.body, json: result.value } } : r;
           }),
+        setBinaryFile: (file) => {
+          useFileStore.getState().setFile(binaryFileKey(get().request.id), file);
+          patch((r) => ({ ...r, body: { ...r.body, binaryFileName: file.name } }));
+        },
+        clearBinaryFile: () => {
+          useFileStore.getState().removeFile(binaryFileKey(get().request.id));
+          patch((r) => ({ ...r, body: { ...r.body, binaryFileName: undefined } }));
+        },
 
         setPreRequestScript: (code) =>
           patch((r) => ({ ...r, scripts: { ...r.scripts, preRequest: code } })),

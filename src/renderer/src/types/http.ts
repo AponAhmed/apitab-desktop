@@ -8,6 +8,12 @@ export interface PreparedHeader {
 export interface PreparedField {
   key: string;
   value: string;
+  /** 'file' rows carry no resolved `value` — the actual bytes are looked up
+   * from `stores/fileStore.ts` by `id` at send time (see requestService.ts). */
+  valueType?: 'text' | 'file';
+  fileName?: string;
+  /** The originating KeyValue row's id — the file-store lookup key. */
+  id?: string;
 }
 
 /**
@@ -24,4 +30,6 @@ export interface PreparedRequest {
   body: string | null;
   /** Field list for multipart form-data bodies. */
   formData?: PreparedField[];
+  /** Display name of the chosen file for a 'binary' body — actual bytes looked up from the file store at send time. */
+  binaryFileName?: string;
 }
