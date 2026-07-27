@@ -11,11 +11,12 @@ import type { GoogleOAuthResult } from '@shared/types';
 // which is why the loopback server below binds a fixed port rather than an
 // OS-assigned one: a Web application client requires an exact, pre-registered
 // redirect URI (no Desktop-app-style "any port" matching).
-// TODO: replace with the new unified "Web application" OAuth client's id
-// once created in Google Cloud Console (Authorized redirect URIs must
-// include http://localhost:51739/, https://kppdfdbhgmaifadkadbedgigdhhijljc.chromiumapp.org/,
-// and the Firefox loopback URI once that hash is known).
-const GOOGLE_CLIENT_ID = '405992136210-5i73a1kpt456s14croh49p0dsp1etf2h.apps.googleusercontent.com';
+// Unified "Web application" OAuth client, shared with both browser
+// extensions (each registers its own redirect URI on the same client).
+// Authorized redirect URIs on this client: http://localhost:51739/,
+// https://kppdfdbhgmaifadkadbedgigdhhijljc.chromiumapp.org/, and the
+// Firefox loopback URI once that hash is known.
+const GOOGLE_CLIENT_ID = '405992136210-fss5livogbvvokl46bdlt839gj8sg3m5.apps.googleusercontent.com';
 const LOOPBACK_PORT = 51739;
 
 function base64url(input: Buffer): string {
@@ -83,7 +84,9 @@ export async function runGoogleOAuthLoopback(): Promise<GoogleOAuthResult> {
     });
 
     server.listen(LOOPBACK_PORT, '127.0.0.1', () => {
-      redirectUri = `http://localhost:${LOOPBACK_PORT}`;
+      // Trailing slash required — a "Web application" OAuth client matches
+      // redirect_uri by exact string against what's registered in Console.
+      redirectUri = `http://localhost:${LOOPBACK_PORT}/`;
 
       const authorizeUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
       authorizeUrl.searchParams.set('client_id', GOOGLE_CLIENT_ID);
