@@ -3,6 +3,7 @@ import { applyPathVariables, splitUrl, urlWithParams } from '@/utils/query';
 import { stripJsonComments } from '@/utils/json';
 import { useFileStore, binaryFileKey } from '@/stores/fileStore';
 import { arrayBufferToBase64 } from '@/utils/binary';
+import { useEnvironmentStore } from '@/stores/environmentStore';
 import { sendExecuteRequest, type WireRequest } from './messaging';
 import type {
   ApiRequest,
@@ -36,6 +37,30 @@ function resolveFormData(list: KeyValue[], vars: VariableMap): PreparedField[] {
 
 function hasHeader(headers: PreparedHeader[], name: string): boolean {
   return headers.some((h) => h.key.toLowerCase() === name.toLowerCase());
+}
+
+/**
+ * Applies a script's env updates to the working vars and the active
+ * environment. Shared by the single-request send path (requestStore.ts) and
+ * the Collection Runner (collectionRunner.ts) so a later request in a run
+ * sees variables an earlier request's script just set, matching how a
+ * normal Send behaves.
+ */
+export function applyEnvUpdates(
+  vars: VariableMap,
+  updates: Record<string, string | null>,
+  activeEnvId: string | null,
+): VariableMap {
+  const next = { ...vars };
+  for (const [key, value] of Object.entries(updates)) {
+    if (value === null) {
+      delete next[key];
+    } else {
+      next[key] = value;
+      if (activeEnvId) useEnvironmentStore.getState().upsertVariable(activeEnvId, key, value);
+    }
+  }
+  return next;
 }
 
 /**

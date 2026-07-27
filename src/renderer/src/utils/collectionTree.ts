@@ -203,3 +203,14 @@ export function flattenContainers(collections: Collection[]): FlatContainer[] {
   for (const c of collections) walk(c, 0);
   return out;
 }
+
+/**
+ * Depth-first, folders-then-requests walk of a container's subtree in the
+ * order it's displayed — the order the Collection Runner executes in.
+ */
+export function flattenRequests(container: Container): ApiRequest[] {
+  const requests: ApiRequest[] = [];
+  for (const folder of container.folders) requests.push(...flattenRequests(folder));
+  requests.push(...container.requests);
+  return requests;
+}

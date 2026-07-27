@@ -4,7 +4,7 @@ import { createRequest, emptyKeyValue } from '@/utils/defaults';
 import { formatJson } from '@/utils/json';
 import { paramsFromUrl, pathVariableNamesFromUrl, urlWithParams } from '@/utils/query';
 import { uuid } from '@/utils/id';
-import { executeRequest, prepareRequest } from '@/services/requestService';
+import { applyEnvUpdates, executeRequest, prepareRequest } from '@/services/requestService';
 import { runScript } from '@/services/scriptRunner';
 import { parseCurl, type ParseCurlResult } from '@/utils/curl';
 import { browserLocalStorage } from './persist';
@@ -25,7 +25,6 @@ import type {
   SavedRequestRef,
   ScriptRunResult,
 } from '@/types';
-import type { VariableMap } from '@/utils/variables';
 
 export type RequestTab = 'params' | 'headers' | 'auth' | 'body' | 'scripts';
 export type ResponseTab = 'body' | 'headers' | 'curl' | 'code' | 'tests';
@@ -34,24 +33,6 @@ function headersToRecord(headers: PreparedHeader[]): Record<string, string> {
   const record: Record<string, string> = {};
   for (const h of headers) record[h.key] = h.value;
   return record;
-}
-
-/** Applies a script's env updates to the working vars and the active environment. */
-function applyEnvUpdates(
-  vars: VariableMap,
-  updates: Record<string, string | null>,
-  activeEnvId: string | null,
-): VariableMap {
-  const next = { ...vars };
-  for (const [key, value] of Object.entries(updates)) {
-    if (value === null) {
-      delete next[key];
-    } else {
-      next[key] = value;
-      if (activeEnvId) useEnvironmentStore.getState().upsertVariable(activeEnvId, key, value);
-    }
-  }
-  return next;
 }
 
 /** Coerces possibly-corrupted (e.g. null from legacy/synced data) fields to safe strings. */

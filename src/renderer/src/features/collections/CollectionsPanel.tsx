@@ -8,6 +8,7 @@ import {
   Folder,
   FolderPlus,
   Pencil,
+  Play,
   Plus,
   Search,
   Trash2,
@@ -24,6 +25,7 @@ import { useAccountStore } from '@/stores/accountStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useDialogStore } from '@/stores/dialogStore';
+import { useRunnerStore } from '@/stores/runnerStore';
 import { toast } from '@/stores/toastStore';
 import { unshareCollection } from '@/services/syncService';
 import { IconButton } from '@/components/ui/IconButton';
@@ -33,8 +35,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { PromptDialog } from '@/components/PromptDialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { ShareToTeamDialog } from './ShareToTeamDialog';
+import { RunnerPanel } from '@/features/runner/RunnerPanel';
 import { cn } from '@/utils/cn';
-import { countRequests, isCollection } from '@/utils/collectionTree';
+import { countRequests, flattenRequests, isCollection } from '@/utils/collectionTree';
 import { exportContainer, parseCollectionExport, sanitizeFilename } from '@/utils/collectionIO';
 import { parsePostmanFile } from '@/utils/postmanImport';
 import { downloadJson, readFileAsText } from '@/services/backup';
@@ -70,6 +73,7 @@ interface CollectionActions {
   newRequest: (parentId: string) => void;
   rename: (container: Container) => void;
   duplicate: (id: string) => void;
+  runContainer: (container: Container) => void;
   removeContainer: (container: Container) => void;
   exportItem: (container: Container) => void;
   importInto: (containerId: string) => void;
@@ -198,6 +202,11 @@ function ContainerNode({
   const items: MenuItem[] = [
     { label: 'New folder', icon: FolderPlus, onClick: () => actions.newFolder(container.id) },
     { label: 'New request', icon: FilePlus2, onClick: () => actions.newRequest(container.id) },
+    {
+      label: root ? 'Run collection' : 'Run folder',
+      icon: Play,
+      onClick: () => actions.runContainer(container),
+    },
     { label: 'Rename', icon: Pencil, onClick: () => actions.rename(container) },
     { label: 'Duplicate', icon: Copy, onClick: () => actions.duplicate(container.id) },
     { label: 'Export', icon: Download, separatorBefore: true, onClick: () => actions.exportItem(container) },
@@ -507,6 +516,7 @@ export function CollectionsPanel() {
     },
     rename: (c) => setRenameTarget({ id: c.id, name: c.name }),
     duplicate: (id) => duplicateContainer(id),
+    runContainer: (c) => useRunnerStore.getState().openFor(c.name, flattenRequests(c)),
     removeContainer: (c) => setDeleteTarget({ id: c.id, name: c.name, kind: 'container' }),
     unshare: (c) => {
       const teamId = (c as Collection).teamId;
@@ -781,6 +791,7 @@ export function CollectionsPanel() {
         onClose={() => setUnshareTarget(null)}
       />
       <ShareToTeamDialog />
+      <RunnerPanel />
     </div>
   );
 }
