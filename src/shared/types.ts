@@ -104,6 +104,24 @@ export interface AppApi {
 }
 
 /**
+ * Result of the main process's native-app OAuth loopback flow
+ * (main/googleOAuth.ts) — an unexchanged authorization code plus the two
+ * values needed to exchange it. The renderer forwards this as-is to
+ * apitab-server's `/auth/google`, which holds the client_secret and
+ * performs the actual code→token exchange with Google.
+ */
+export interface GoogleOAuthResult {
+  code: string;
+  redirectUri: string;
+  codeVerifier: string;
+}
+
+export interface OAuthApi {
+  /** Opens the system browser for Google sign-in and resolves once the loopback redirect lands. */
+  googleLogin(): Promise<GoogleOAuthResult>;
+}
+
+/**
  * Self-update flow backed by `electron-updater` (main/autoUpdate.ts), which
  * checks GitHub Releases directly — no server involved. `unsupported` covers
  * dev/unpacked runs, where electron-updater has no installed app to replace.

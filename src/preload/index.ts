@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { electronAPI } from '@electron-toolkit/preload';
 import type {
   AppApi,
+  GoogleOAuthResult,
+  OAuthApi,
   PreparedRequest,
   RequestResult,
   StorageApi,
@@ -37,6 +39,9 @@ const api = {
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
     getPlatform: () => ipcRenderer.invoke('app:getPlatform'),
   } satisfies AppApi,
+  oauth: {
+    googleLogin: (): Promise<GoogleOAuthResult> => ipcRenderer.invoke('oauth:google'),
+  } satisfies OAuthApi,
   update: {
     getStatus: () => ipcRenderer.invoke('update:getStatus'),
     check: () => ipcRenderer.invoke('update:check'),

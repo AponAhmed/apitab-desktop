@@ -89,6 +89,9 @@ export const apiClient = {
   login: (email: string, password: string) =>
     request<AuthSession>('POST', '/login', { email, password }, false),
 
+  loginWithGoogle: (code: string, redirectUri: string, codeVerifier: string) =>
+    request<AuthSession>('POST', '/auth/google', { code, redirectUri, codeVerifier }, false),
+
   logout: () => request<{ message: string }>('POST', '/logout'),
 
   forgotPassword: (email: string) =>

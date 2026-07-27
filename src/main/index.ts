@@ -5,6 +5,7 @@ import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { executeRequest } from './requestHandler';
 import { storageClear, storageGet, storageRemove, storageSet } from './store';
 import { registerAutoUpdate } from './autoUpdate';
+import { runGoogleOAuthLoopback } from './googleOAuth';
 import type { PreparedRequest } from '@shared/types';
 import icon from '../../resources/icon.png?asset';
 
@@ -116,6 +117,10 @@ app.whenReady().then(() => {
   // the desktop equivalent of the extension's `EXECUTE_REQUEST` runtime
   // message handled in its background service worker.
   ipcMain.handle('request:send', (_event, req: PreparedRequest) => executeRequest(req));
+
+  // Opens the system browser for Google sign-in and resolves once the
+  // native-app loopback redirect lands (see googleOAuth.ts).
+  ipcMain.handle('oauth:google', () => runGoogleOAuthLoopback());
 
   // Storage, shaped like `browser.storage.local` (see store.ts) so the
   // extension's Zustand persist adapter ports over with minimal changes.
