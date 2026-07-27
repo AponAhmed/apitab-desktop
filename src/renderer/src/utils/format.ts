@@ -37,3 +37,18 @@ export function formatRelativeTime(ts: number, now = Date.now()): string {
 export function byteLength(text: string): number {
   return new TextEncoder().encode(text).length;
 }
+
+/**
+ * Truncates long filenames in the middle instead of the end, so the
+ * extension (and enough of the start to still recognize the file) stays
+ * visible instead of being the part that gets cut off — e.g.
+ * "gratisography-augmented-reality-800x525.jpg" (44 chars) at maxLength 28
+ * becomes "gratisography-au…y-800x525.jpg".
+ */
+export function middleEllipsis(name: string, maxLength = 28): string {
+  if (name.length <= maxLength) return name;
+  const charsToShow = maxLength - 1; // reserve 1 for the ellipsis character
+  const frontChars = Math.ceil(charsToShow * 0.6);
+  const backChars = Math.floor(charsToShow * 0.4);
+  return `${name.slice(0, frontChars)}…${name.slice(name.length - backChars)}`;
+}

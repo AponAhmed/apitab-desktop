@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { IconButton } from '@/components/ui/IconButton';
 import { cn } from '@/utils/cn';
 import { validateJson } from '@/utils/json';
+import { middleEllipsis } from '@/utils/format';
 import { METHODS_WITH_BODY, type BodyType } from '@/types';
 
 const BODY_TYPES: { id: BodyType; label: string }[] = [
@@ -109,8 +110,11 @@ function BinaryBody() {
         </Button>
       ) : (
         <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700">
-          <span className="min-w-0 flex-1 truncate font-mono text-sm text-slate-700 dark:text-slate-200">
-            {fileName}
+          <span
+            title={fileName}
+            className="min-w-0 flex-1 truncate font-mono text-sm text-slate-700 dark:text-slate-200"
+          >
+            {fileName && middleEllipsis(fileName, 48)}
           </span>
           <IconButton size="sm" onClick={clearBinaryFile} aria-label="Remove file">
             <X className="h-4 w-4" />

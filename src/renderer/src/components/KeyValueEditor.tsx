@@ -6,6 +6,7 @@ import { IconButton } from './ui/IconButton';
 import { VariableInput } from './VariableInput';
 import { SuggestionDropdown } from './SuggestionDropdown';
 import { useFileStore, formDataFileKey } from '@/stores/fileStore';
+import { middleEllipsis } from '@/utils/format';
 import type { KeyValue } from '@/types';
 
 interface KeyValueEditorProps {
@@ -174,9 +175,10 @@ function FileValueCell({
       <button
         type="button"
         onClick={() => fileRef.current?.click()}
+        title={fileName}
         className="min-w-0 flex-1 truncate text-left font-mono text-sm text-slate-600 hover:text-brand-600 dark:text-slate-300 dark:hover:text-brand-400"
       >
-        {fileName || 'Choose file…'}
+        {fileName ? middleEllipsis(fileName, 24) : 'Choose file…'}
       </button>
       {fileName && (
         <IconButton size="sm" onClick={onClear} aria-label="Remove file">
