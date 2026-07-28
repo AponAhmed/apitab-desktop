@@ -355,8 +355,27 @@ export async function runSyncTick(teamId: string, opts?: { silent?: boolean }): 
  * it silently overwrites the fresh in-memory state with the still-in-flight
  * or stale on-disk copy (session reverts to null, or teams to []), aborting
  * the sync below with no error and an empty workspace.
+ *
+ * Re-entrancy guarded: `useTeamSync.ts`'s mount effect, its timer/focus tick,
+ * and `LoginDialog.tsx`'s post-login call can all fire within the same
+ * moment (e.g. logging in bumps `teamCount`, which independently re-triggers
+ * the mount effect). Without a guard, two overlapping passes could both hit
+ * the same push conflict and each show their own toast — the concrete cause
+ * of reported duplicate sync notifications. A caller that arrives while a
+ * pass is already running just joins that same in-flight promise instead of
+ * starting a second one.
  */
-export async function runAllTeamsSync(opts?: { skipRehydrate?: boolean; silent?: boolean }): Promise<void> {
+let syncInFlight: Promise<void> | null = null;
+
+export function runAllTeamsSync(opts?: { skipRehydrate?: boolean; silent?: boolean }): Promise<void> {
+  if (syncInFlight) return syncInFlight;
+  syncInFlight = runAllTeamsSyncInner(opts).finally(() => {
+    syncInFlight = null;
+  });
+  return syncInFlight;
+}
+
+async function runAllTeamsSyncInner(opts?: { skipRehydrate?: boolean; silent?: boolean }): Promise<void> {
   if (!opts?.skipRehydrate) {
     // Storage hydration is async (IPC round-trip to the main process) — make
     // sure it has finished before trusting `session`/`teams`, otherwise a poll

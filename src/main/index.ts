@@ -3,7 +3,7 @@ import dns from 'node:dns';
 import { app, shell, BrowserWindow, ipcMain } from 'electron';
 import { electronApp, is, optimizer } from '@electron-toolkit/utils';
 import { executeRequest } from './requestHandler';
-import { storageClear, storageGet, storageRemove, storageSet } from './store';
+import { flushPendingWrites, storageClear, storageGet, storageRemove, storageSet } from './store';
 import { registerAutoUpdate } from './autoUpdate';
 import { runGoogleOAuthLoopback } from './googleOAuth';
 import type { PreparedRequest } from '@shared/types';
@@ -161,4 +161,10 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+// Storage writes are debounced (see store.ts) — flush any pending write
+// synchronously before the process actually exits, or it would be lost.
+app.on('before-quit', () => {
+  flushPendingWrites();
 });

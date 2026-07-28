@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useRef, useState } from 'react';
+import { createContext, memo, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -91,7 +91,14 @@ const useActions = () => useContext(ActionsContext)!;
 
 const INDENT = 12;
 
-function RequestNode({
+// Memoized: without this, every row in the (potentially hundreds-of-rows)
+// collection tree re-renders whenever CollectionsPanel re-renders for any
+// reason (e.g. unrelated local state like the search box or a dialog's open
+// flag) — React re-renders all children of a re-rendered parent by default,
+// regardless of whether their own props/context actually changed. Paired
+// with the stable `actions` (useMemo, below) and `toggle` (useCallback,
+// below) so memo's shallow prop comparison can actually take effect.
+const RequestNode = memo(function RequestNode({
   request,
   containerId,
   depth,
@@ -167,9 +174,9 @@ function RequestNode({
       </div>
     </div>
   );
-}
+});
 
-function ContainerNode({
+const ContainerNode = memo(function ContainerNode({
   container,
   depth,
   collapsed,
@@ -368,7 +375,7 @@ function ContainerNode({
       )}
     </div>
   );
-}
+});
 
 interface WorkspaceGroup {
   key: string;
@@ -443,6 +450,11 @@ export function CollectionsPanel() {
   const moveRequest = useCollectionStore((s) => s.moveRequest);
   const reorderCollections = useCollectionStore((s) => s.reorderCollections);
   const [dragging, setDragging] = useState<DragPayload | null>(null);
+  // Same reasoning as `actions` below — useContext consumption bypasses
+  // React.memo's prop comparison entirely, so this Provider's value must
+  // itself be stable or every memoized consumer re-renders whenever this
+  // component does, regardless of memo.
+  const dragContextValue = useMemo(() => ({ dragging, setDragging }), [dragging, setDragging]);
 
   const loadRequest = useRequestStore((s) => s.loadRequest);
   const activeRequestId = useRequestStore((s) => s.savedRef?.requestId ?? null);
@@ -478,7 +490,12 @@ export function CollectionsPanel() {
   const fileRef = useRef<HTMLInputElement>(null);
   const importTarget = useRef<string | null>(null);
 
-  const toggle = (id: string) => toggleContainerCollapsed(id);
+  // Stable reference (like `actions` below) — ContainerNode is memoized, so
+  // a fresh function here on every render would defeat that memoization.
+  const toggle = useCallback(
+    (id: string) => toggleContainerCollapsed(id),
+    [toggleContainerCollapsed],
+  );
 
   const q = search.trim().toLowerCase();
   const visible = useMemo(
@@ -506,45 +523,71 @@ export function CollectionsPanel() {
     [groups, activeWorkspaceKey],
   );
 
-  const actions: CollectionActions = {
-    activeRequestId,
-    openRequest: (containerId, req) => loadRequest(req, { containerId, requestId: req.id }),
-    newFolder: (parentId) => setFolderParent(parentId),
-    newRequest: (parentId) => {
-      const created = addRequest(parentId, createRequest(), 'Untitled Request');
-      if (created) loadRequest(created, { containerId: parentId, requestId: created.id });
-    },
-    rename: (c) => setRenameTarget({ id: c.id, name: c.name }),
-    duplicate: (id) => duplicateContainer(id),
-    runContainer: (c) => useRunnerStore.getState().openFor(c.name, flattenRequests(c)),
-    removeContainer: (c) => setDeleteTarget({ id: c.id, name: c.name, kind: 'container' }),
-    unshare: (c) => {
-      const teamId = (c as Collection).teamId;
-      if (teamId) setUnshareTarget({ id: c.id, name: c.name, teamId });
-    },
-    exportItem: (c) => {
-      const activeEnv = environments.find((e) => e.id === activeEnvId);
-      const sharedVars = (activeEnv?.variables ?? [])
-        .filter((v) => v.shared && v.key.trim() !== '')
-        .map((v) => ({ key: v.key.trim(), value: v.value }));
-      downloadJson(`apitab-${sanitizeFilename(c.name)}.json`, exportContainer(c, sharedVars));
-      toast.success(
-        sharedVars.length
-          ? `Exported with ${sharedVars.length} shared variable${sharedVars.length === 1 ? '' : 's'}`
-          : 'Exported',
-      );
-    },
-    importInto: (containerId) => {
-      importTarget.current = containerId;
-      fileRef.current?.click();
-    },
-    duplicateRequest,
-    deleteRequest: (req) => setDeleteTarget({ id: req.id, name: req.name, kind: 'request' }),
-    shareToTeam: (collectionId) => openShareToTeam(collectionId),
-    moveFolder,
-    moveRequest,
-    reorderCollections,
-  };
+  // Memoized so its identity only changes when one of its actual inputs
+  // does — this is the Context value passed down to the entire (potentially
+  // hundreds-of-rows) collection tree below, and rebuilding it as a fresh
+  // object on every render (e.g. on every keystroke in the search box above,
+  // which is unrelated state in this same component) forced every row in
+  // the tree to re-render on every keystroke.
+  const actions: CollectionActions = useMemo(
+    () => ({
+      activeRequestId,
+      openRequest: (containerId, req) => loadRequest(req, { containerId, requestId: req.id }),
+      newFolder: (parentId) => setFolderParent(parentId),
+      newRequest: (parentId) => {
+        const created = addRequest(parentId, createRequest(), 'Untitled Request');
+        if (created) loadRequest(created, { containerId: parentId, requestId: created.id });
+      },
+      rename: (c) => setRenameTarget({ id: c.id, name: c.name }),
+      duplicate: (id) => duplicateContainer(id),
+      runContainer: (c) => useRunnerStore.getState().openFor(c.name, flattenRequests(c)),
+      removeContainer: (c) => setDeleteTarget({ id: c.id, name: c.name, kind: 'container' }),
+      unshare: (c) => {
+        const teamId = (c as Collection).teamId;
+        if (teamId) setUnshareTarget({ id: c.id, name: c.name, teamId });
+      },
+      exportItem: (c) => {
+        const activeEnv = environments.find((e) => e.id === activeEnvId);
+        const sharedVars = (activeEnv?.variables ?? [])
+          .filter((v) => v.shared && v.key.trim() !== '')
+          .map((v) => ({ key: v.key.trim(), value: v.value }));
+        downloadJson(`apitab-${sanitizeFilename(c.name)}.json`, exportContainer(c, sharedVars));
+        toast.success(
+          sharedVars.length
+            ? `Exported with ${sharedVars.length} shared variable${sharedVars.length === 1 ? '' : 's'}`
+            : 'Exported',
+        );
+      },
+      importInto: (containerId) => {
+        importTarget.current = containerId;
+        fileRef.current?.click();
+      },
+      duplicateRequest,
+      deleteRequest: (req) => setDeleteTarget({ id: req.id, name: req.name, kind: 'request' }),
+      shareToTeam: (collectionId) => openShareToTeam(collectionId),
+      moveFolder,
+      moveRequest,
+      reorderCollections,
+    }),
+    [
+      activeRequestId,
+      loadRequest,
+      setFolderParent,
+      addRequest,
+      setRenameTarget,
+      duplicateContainer,
+      setDeleteTarget,
+      environments,
+      activeEnvId,
+      importTarget,
+      fileRef,
+      duplicateRequest,
+      openShareToTeam,
+      moveFolder,
+      moveRequest,
+      reorderCollections,
+    ],
+  );
 
   const importCollectionExport = (data: NonNullable<ReturnType<typeof parseCollectionExport>['data']>) => {
     const target = importTarget.current;
@@ -637,7 +680,7 @@ export function CollectionsPanel() {
           />
         ) : (
           <ActionsContext.Provider value={actions}>
-          <DragContext.Provider value={{ dragging, setDragging }}>
+          <DragContext.Provider value={dragContextValue}>
             {visibleGroups.map((group) => (
               <div key={group.key} className="mb-3">
                 <div

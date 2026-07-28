@@ -15,9 +15,14 @@ interface ToastState {
   dismiss: (id: string) => void;
 }
 
-export const useToastStore = create<ToastState>((set) => ({
+export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
   push: (message, type = 'info') => {
+    // Guards against the same message stacking twice — e.g. two overlapping
+    // sync passes both hitting the same conflict (see syncService.ts's
+    // runAllTeamsSync re-entrancy guard for the other half of that fix).
+    if (get().toasts.some((t) => t.message === message && t.type === type)) return;
+
     const id = uuid();
     set((s) => ({ toasts: [...s.toasts, { id, message, type }] }));
     setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), 2600);

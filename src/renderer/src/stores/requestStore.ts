@@ -95,6 +95,12 @@ function normalizeForEditing(req: ApiRequest): ApiRequest {
   const merged: ApiRequest = {
     ...base,
     ...req,
+    // Explicit fallbacks (the spread above only catches `undefined`/absent
+    // keys, not an explicit `null` surviving from corrupted/imported/synced
+    // data) — an unguarded `null` here crashes UrlBar's `url.trim()` and
+    // takes down the whole app with no error boundary to catch it.
+    name: req.name ?? '',
+    url: req.url ?? '',
     auth: {
       type: req.auth?.type ?? 'none',
       // Field-by-field (not a spread merge) so an explicit `null` surviving
