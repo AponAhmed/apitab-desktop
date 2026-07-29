@@ -135,12 +135,18 @@ export type UpdateStatus =
   // requires the running app to be code-signed to replace itself in place;
   // this app isn't signed, so that always fails. `download()` opens this
   // URL (the .dmg release asset) in the browser for a manual install instead.
-  | { state: 'available'; version: string; downloadUrl?: string }
+  | { state: 'available'; version: string; downloadUrl?: string; releaseNotes?: string }
   | { state: 'not-available' }
   | { state: 'downloading'; percent: number }
-  | { state: 'downloaded'; version: string }
+  | { state: 'downloaded'; version: string; releaseNotes?: string }
   | { state: 'error'; message: string }
   | { state: 'unsupported' };
+
+/** What's New content for the version just installed — see main/autoUpdate.ts's pendingWhatsNew handling. */
+export interface WhatsNewInfo {
+  version: string;
+  releaseNotes?: string;
+}
 
 export interface UpdateApi {
   getStatus(): Promise<UpdateStatus>;
@@ -149,6 +155,9 @@ export interface UpdateApi {
   install(): Promise<void>;
   /** Returns an unsubscribe function. */
   onStatus(cb: (status: UpdateStatus) => void): () => void;
+  /** Non-null exactly once, right after an update brought the app to a new version. */
+  getWhatsNew(): Promise<WhatsNewInfo | null>;
+  dismissWhatsNew(): Promise<void>;
 }
 
 /**

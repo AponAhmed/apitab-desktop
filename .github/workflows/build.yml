@@ -74,6 +74,36 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Full history + tags — needed to diff against the previous release,
+      # unlike the build job's default shallow checkout.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # This repo commits feat:/fix:/build: directly to master (see commit
+      # log) rather than through PRs, so action-gh-release's own
+      # generate_release_notes (which summarizes merged PRs) had nothing to
+      # summarize and only ever emitted the compare-link footer. Build the
+      # "What's Changed" list from commit subjects since the previous tag
+      # instead — surfaced in-app as What's New (see main/autoUpdate.ts).
+      - name: Generate release notes
+        id: changelog
+        run: |
+          PREV_TAG=$(git tag --sort=-v:refname | grep -A1 "^${GITHUB_REF_NAME}$" | tail -1)
+          {
+            echo "## What's Changed"
+            if [ "$PREV_TAG" != "$GITHUB_REF_NAME" ] && [ -n "$PREV_TAG" ]; then
+              git log "$PREV_TAG..$GITHUB_REF_NAME" --pretty=format:'%s' --no-merges | grep -Ev '^Bump version to ' | sed 's/^/- /'
+            else
+              git log --pretty=format:'%s' --no-merges | grep -Ev '^Bump version to ' | sed 's/^/- /'
+            fi
+            if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "$GITHUB_REF_NAME" ]; then
+              echo ""
+              echo "**Full Changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${PREV_TAG}...${GITHUB_REF_NAME}"
+            fi
+          } > release-notes.md
+          cat release-notes.md
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -81,4 +111,4 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
-          generate_release_notes: true
+          body_path: release-notes.md
