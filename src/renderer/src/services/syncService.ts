@@ -311,6 +311,19 @@ export async function unshareCollection(collectionId: string, teamId: string): P
   }
 }
 
+// `lastSyncedAt` is a persisted cursor — the server's `/sync` only returns
+// collections/variables *changed since* it, so anything that ever let the
+// cursor advance past data the client hadn't actually durably saved (the
+// collectionStore hydration race fixed above is one concrete way this
+// happened) leaves that data permanently invisible: nothing about it will
+// ever look "changed" to the server again. Forcing one full resync
+// (since=0) per team the first time it's synced in this process's lifetime
+// self-heals that class of drift automatically — for every current or
+// future cause of it, not just the one bug already found — without
+// requiring the user to notice anything or take any action. Cheap: once
+// per team per cold start (fresh app launch), not on every periodic poll tick.
+const fullyResyncedTeams = new Set<string>();
+
 /**
  * `silent` skips the `isSyncing` flag that drives the toolbar's spinning
  * icon — for a periodic background poll, spinning on every tick reads as
@@ -320,8 +333,10 @@ export async function unshareCollection(collectionId: string, teamId: string): P
 export async function runSyncTick(teamId: string, opts?: { silent?: boolean }): Promise<void> {
   if (!opts?.silent) useTeamStore.getState().setSyncing(true);
   try {
-    const since = useTeamStore.getState().lastSyncedAt[teamId] ?? 0;
+    const forceFullResync = !fullyResyncedTeams.has(teamId);
+    const since = forceFullResync ? 0 : (useTeamStore.getState().lastSyncedAt[teamId] ?? 0);
     const res = await apiClient.fetchSync(teamId, since);
+    fullyResyncedTeams.add(teamId);
 
     applyingRemote = true;
     try {
