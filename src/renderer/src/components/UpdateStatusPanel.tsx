@@ -1,7 +1,32 @@
-import { AlertCircle, CheckCircle2, Download, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Download, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from './ui/Button';
+import { MiniMarkdown } from '@/utils/miniMarkdown';
 import { useAutoUpdate } from '@/hooks/useAutoUpdate';
+
+/** Collapsible "What's New" disclosure — shared by the available/downloaded states below so a user can review changes before installing, per the feature request. */
+function ReleaseNotesDisclosure({ releaseNotes }: { releaseNotes?: string }) {
+  const [open, setOpen] = useState(false);
+  if (!releaseNotes) return null;
+
+  return (
+    <div className="mt-1.5">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1 text-[11px] font-medium text-brand-600 hover:underline dark:text-brand-400"
+      >
+        {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        What&rsquo;s New
+      </button>
+      {open && (
+        <div className="mt-1.5 max-h-40 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-900/60">
+          <MiniMarkdown text={releaseNotes} />
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Update state + actions, shared by AboutDialog and UpdateAvailableBell. */
 export function UpdateStatusPanel() {
@@ -25,30 +50,33 @@ export function UpdateStatusPanel() {
           <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Checking for updates…
         </p>
       ) : status.state === 'available' ? (
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-slate-600 dark:text-slate-300">
-            Update available: <span className="font-medium">v{status.version}</span>
-          </p>
-          {status.downloadUrl ? (
-            // macOS: no in-app install — see the comment on UpdateStatus in
-            // shared/types.ts for why. Opens the .dmg in the browser instead.
-            <Button size="sm" onClick={() => void download()}>
-              <Download className="h-3.5 w-3.5" />
-              Download Update
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              disabled={starting}
-              onClick={() => {
-                setStarting(true);
-                void download();
-              }}
-            >
-              <Download className="h-3.5 w-3.5" />
-              {starting ? 'Updating…' : 'Update Now'}
-            </Button>
-          )}
+        <div>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              Update available: <span className="font-medium">v{status.version}</span>
+            </p>
+            {status.downloadUrl ? (
+              // macOS: no in-app install — see the comment on UpdateStatus in
+              // shared/types.ts for why. Opens the .dmg in the browser instead.
+              <Button size="sm" onClick={() => void download()}>
+                <Download className="h-3.5 w-3.5" />
+                Download Update
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                disabled={starting}
+                onClick={() => {
+                  setStarting(true);
+                  void download();
+                }}
+              >
+                <Download className="h-3.5 w-3.5" />
+                {starting ? 'Updating…' : 'Update Now'}
+              </Button>
+            )}
+          </div>
+          <ReleaseNotesDisclosure releaseNotes={status.releaseNotes} />
         </div>
       ) : status.state === 'downloading' ? (
         <div className="space-y-1.5">
@@ -63,13 +91,16 @@ export function UpdateStatusPanel() {
           </div>
         </div>
       ) : status.state === 'downloaded' ? (
-        <div className="flex items-center justify-between gap-2">
-          <p className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 className="h-3.5 w-3.5" /> v{status.version} ready to install
-          </p>
-          <Button size="sm" variant="primary" onClick={() => void install()}>
-            Restart &amp; Install
-          </Button>
+        <div>
+          <div className="flex items-center justify-between gap-2">
+            <p className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="h-3.5 w-3.5" /> v{status.version} ready to install
+            </p>
+            <Button size="sm" variant="primary" onClick={() => void install()}>
+              Restart &amp; Install
+            </Button>
+          </div>
+          <ReleaseNotesDisclosure releaseNotes={status.releaseNotes} />
         </div>
       ) : status.state === 'error' ? (
         <div className="flex items-center justify-between gap-2">

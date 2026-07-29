@@ -54,6 +54,8 @@ const api = {
         ipcRenderer.removeListener('update:status', listener);
       };
     },
+    getWhatsNew: () => ipcRenderer.invoke('update:getWhatsNew'),
+    dismissWhatsNew: () => ipcRenderer.invoke('update:dismissWhatsNew'),
   } satisfies UpdateApi,
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),

@@ -1,5 +1,6 @@
 import { Workspace } from '@/features/layout/Workspace';
 import { OptionsPage } from '@/pages/OptionsPage';
+import { WhatsNewDialog } from '@/components/WhatsNewDialog';
 import { useDialogStore } from '@/stores/dialogStore';
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
           <OptionsPage onClose={closeSettings} />
         </div>
       )}
+      <WhatsNewDialog />
     </>
   );
 }
