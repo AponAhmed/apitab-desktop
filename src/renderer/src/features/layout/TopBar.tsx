@@ -98,7 +98,7 @@ export function TopBar() {
           </div>
 
           {/* Utilities: sync, notifications, app-level actions. */}
-          <div className={CLUSTER}>
+          <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 dark:border-slate-800 dark:bg-white/[0.04]">
             <SyncButton />
             <PendingAssignmentsBell />
             <UpdateAvailableBell />
