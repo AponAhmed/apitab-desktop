@@ -536,7 +536,13 @@ export function CollectionsPanel() {
       newFolder: (parentId) => setFolderParent(parentId),
       newRequest: (parentId) => {
         const created = addRequest(parentId, createRequest(), 'Untitled Request');
-        if (created) loadRequest(created, { containerId: parentId, requestId: created.id });
+        if (created) {
+          // A collapsed folder would otherwise hide the very request just
+          // created inside it — expand it so the new (already-active/
+          // highlighted via loadRequest below) row is immediately visible.
+          useUiStore.getState().expandContainer(parentId);
+          loadRequest(created, { containerId: parentId, requestId: created.id });
+        }
       },
       rename: (c) => setRenameTarget({ id: c.id, name: c.name }),
       duplicate: (id) => duplicateContainer(id),
