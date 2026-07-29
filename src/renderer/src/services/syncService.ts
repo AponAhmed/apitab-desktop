@@ -381,8 +381,18 @@ async function runAllTeamsSyncInner(opts?: { skipRehydrate?: boolean; silent?: b
     // sure it has finished before trusting `session`/`teams`, otherwise a poll
     // that fires very early (e.g. on first mount) could read stale (empty)
     // initial state and silently skip.
+    //
+    // collections/teamVariables need the same guard for a different reason:
+    // mergeSync (below, via runSyncTick) upserts the *pulled delta* onto
+    // whatever's currently in memory — `{ ...current, ...incoming }` — so if
+    // this sync's network round trip resolves before that store's own
+    // (separate, unawaited) persist hydration finishes, mergeSync runs
+    // against an empty in-memory array, and the truncated result (just this
+    // delta) gets persisted, silently overwriting the real on-disk data.
     await useAccountStore.persist.rehydrate();
     await useTeamStore.persist.rehydrate();
+    await useCollectionStore.persist.rehydrate();
+    await useTeamVariablesStore.persist.rehydrate();
   }
 
   const session = useAccountStore.getState().session;
