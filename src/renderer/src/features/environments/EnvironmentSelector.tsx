@@ -13,7 +13,7 @@ export function EnvironmentSelector() {
       <Select
         value={activeId ?? ''}
         onChange={(e) => setActive(e.target.value || null)}
-        className="h-8 w-36 text-xs border-transparent bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 focus:bg-slate-100 dark:focus:bg-slate-800 shadow-none focus:ring-0"
+        className="h-7 w-36 text-xs border-transparent bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 focus:bg-slate-100 dark:focus:bg-slate-800 shadow-none focus:ring-0"
         aria-label="Active environment"
       >
         <option value="">No Environment</option>

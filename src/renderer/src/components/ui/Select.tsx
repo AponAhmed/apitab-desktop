@@ -49,12 +49,16 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(
     const options = useMemo(() => extractOptions(children), [children]);
     const selected = options.find((o) => o.value === value);
     // `cn` is a plain joiner (no Tailwind conflict resolution), so a
-    // caller-supplied width/height (e.g. `w-[104px]` on the method selector,
-    // or `h-7` on a compact one) would silently lose to these base classes
-    // depending on generated CSS order — only fall back to the defaults
-    // when the caller didn't specify their own.
+    // caller-supplied width/height/border/background/focus-ring (e.g.
+    // `w-[104px]` on the method selector, `h-7` on a compact one, or a
+    // borderless/transparent toolbar variant) would silently lose to these
+    // base classes depending on generated CSS order — only fall back to
+    // the defaults when the caller didn't specify their own.
     const hasWidthClass = !!className && /(^|\s)w-\S+/.test(className);
     const hasHeightClass = !!className && /(^|\s)h-\S+/.test(className);
+    const hasBorderClass = !!className && /\bborder(-|\b)/.test(className);
+    const hasBgClass = !!className && /\bbg-\S+/.test(className);
+    const hasRingClass = !!className && /(\bring(-|\b)|\bshadow(-|\b))/.test(className);
 
     const [open, setOpen] = useState(false);
     const [pos, setPos] = useState({ x: 0, y: 0, width: 0 });
@@ -115,9 +119,13 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(
           aria-expanded={open}
           onClick={() => (open ? setOpen(false) : openMenu())}
           className={cn(
-            'flex items-center justify-between gap-1.5 rounded-md border border-slate-300 bg-white pl-2.5 pr-2 text-sm text-slate-800 transition-colors hover:border-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:border-slate-500',
+            'flex items-center justify-between gap-1.5 rounded-md pl-2.5 pr-2 text-sm text-slate-800 transition-colors focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100',
             !hasWidthClass && 'w-full',
             !hasHeightClass && 'h-8',
+            !hasBorderClass &&
+              'border border-slate-300 hover:border-slate-400 focus:border-brand-500 dark:border-slate-600 dark:hover:border-slate-500',
+            !hasBgClass && 'bg-white dark:bg-slate-800',
+            !hasRingClass && 'focus:ring-2 focus:ring-brand-500/25',
             mono && 'font-mono',
             className,
           )}
