@@ -45,7 +45,10 @@ export function createRequest(partial: Partial<ApiRequest> = {}): ApiRequest {
     url: '',
     params: [emptyKeyValue()],
     pathVariables: [],
-    headers: [emptyKeyValue()],
+    // Nearly every REST API returns JSON, so a fresh request starts with this
+    // pre-filled rather than making every user type it by hand — still fully
+    // editable/removable like any other header row.
+    headers: [emptyKeyValue({ key: 'Accept', value: 'application/json' }), emptyKeyValue()],
     auth: defaultAuth(),
     body: defaultBody(),
     scripts: defaultScripts(),
