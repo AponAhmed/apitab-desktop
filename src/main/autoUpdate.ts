@@ -14,17 +14,22 @@ function setStatus(next: UpdateStatus): void {
 }
 
 /**
- * electron-updater's `releaseNotes` is a single markdown string for the
- * latest release, or — when the running app is several versions behind —
- * an array of `{version, note}` covering every version in between. Flatten
- * either shape into one markdown string, newest first.
+ * electron-updater's `releaseNotes` is a single HTML string for the latest
+ * release, or — when the running app is several versions behind — an array
+ * of `{version, note}` (each `note` also HTML) covering every version in
+ * between. It's HTML, not markdown: for the GitHub provider it's read from
+ * the repo's releases.atom feed, where GitHub itself renders each release
+ * body's markdown to HTML (`<content type="html">`) before this ever
+ * reaches the app — confirmed by the `class="commit-link"` GitHub adds to
+ * the compare-link, which only exists in its rendered output, never in the
+ * raw body. Flatten either shape into one HTML string, newest first.
  */
 function normalizeReleaseNotes(
   notes: string | Array<{ version: string; note: string | null }> | null | undefined,
 ): string | undefined {
   if (!notes) return undefined;
   if (typeof notes === 'string') return notes;
-  return notes.map((n) => `## v${n.version}\n\n${n.note ?? ''}`).join('\n\n');
+  return notes.map((n) => `<h3>v${n.version}</h3>${n.note ?? ''}`).join('');
 }
 
 const PENDING_WHATS_NEW_KEY = 'apitab:pendingWhatsNew';

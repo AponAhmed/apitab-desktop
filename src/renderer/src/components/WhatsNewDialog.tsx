@@ -1,7 +1,7 @@
 import { Sparkles } from 'lucide-react';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
-import { MiniMarkdown } from '@/utils/miniMarkdown';
+import { ReleaseNotesHtml } from '@/utils/releaseNotesHtml';
 import { useWhatsNew } from '@/hooks/useWhatsNew';
 
 /** Auto-shows once per update — see useWhatsNew()/main/autoUpdate.ts's pendingWhatsNew handling. */
@@ -26,7 +26,7 @@ export function WhatsNewDialog() {
     >
       <div className="max-h-[50vh] overflow-y-auto pr-1">
         {info?.releaseNotes ? (
-          <MiniMarkdown text={info.releaseNotes} />
+          <ReleaseNotesHtml html={info.releaseNotes} />
         ) : (
           <p className="text-xs text-slate-500 dark:text-slate-400">
             You&rsquo;re now on the latest version.

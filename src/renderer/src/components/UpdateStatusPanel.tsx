@@ -1,7 +1,7 @@
 import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Download, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from './ui/Button';
-import { MiniMarkdown } from '@/utils/miniMarkdown';
+import { ReleaseNotesHtml } from '@/utils/releaseNotesHtml';
 import { useAutoUpdate } from '@/hooks/useAutoUpdate';
 
 /** Collapsible "What's New" disclosure — shared by the available/downloaded states below so a user can review changes before installing, per the feature request. */
@@ -21,7 +21,7 @@ function ReleaseNotesDisclosure({ releaseNotes }: { releaseNotes?: string }) {
       </button>
       {open && (
         <div className="mt-1.5 max-h-40 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-900/60">
-          <MiniMarkdown text={releaseNotes} />
+          <ReleaseNotesHtml html={releaseNotes} />
         </div>
       )}
     </div>
