@@ -1,10 +1,13 @@
-import { useEffect, useId, useMemo, useRef, useState, type FocusEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Trash2, Share2, Paperclip, Type, X } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Toggle } from './ui/Toggle';
 import { IconButton } from './ui/IconButton';
 import { VariableInput } from './VariableInput';
 import { SuggestionDropdown } from './SuggestionDropdown';
+import { VariableAutocomplete } from './VariableAutocomplete';
+import { findOpenVariableTrigger } from '@/utils/variables';
+import { useActiveVariables } from '@/hooks/useActiveVariables';
 import { useFileStore, formDataFileKey } from '@/stores/fileStore';
 import { middleEllipsis } from '@/utils/format';
 import type { KeyValue } from '@/types';
@@ -89,6 +92,7 @@ function ExpandableValueCell({
   const [focused, setFocused] = useState(false);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const vars = useActiveVariables();
 
   useEffect(() => {
     if (focused) autosize(textareaRef.current);
@@ -105,8 +109,80 @@ function ExpandableValueCell({
     setFocused(false);
   };
 
-  const dropdown = anchor && filtered.length > 0 && (
-    <SuggestionDropdown suggestions={filtered} anchor={anchor} onSelect={select} />
+  // The expanding textarea (below) is a separate element from the collapsed
+  // Cell/VariableInput view, so it needs its own `{{`-trigger autocomplete —
+  // otherwise the moment a value cell is focused for editing, variable
+  // suggestions (available everywhere else: URL, params, the key cell here)
+  // silently stop working.
+  const [varTrigger, setVarTrigger] = useState<{
+    triggerStart: number;
+    query: string;
+    highlightedIndex: number;
+  } | null>(null);
+  const varNames = useMemo(() => {
+    if (!varTrigger) return [];
+    const q = varTrigger.query.toLowerCase();
+    return Object.keys(vars).filter((n) => n.toLowerCase().includes(q));
+  }, [varTrigger, vars]);
+
+  const insertVariable = (name: string) => {
+    if (!varTrigger) return;
+    const el = textareaRef.current;
+    const caret = el?.selectionStart ?? value.length;
+    const newValue = `${value.slice(0, varTrigger.triggerStart)}{{${name}}}${value.slice(caret)}`;
+    onChange(newValue);
+    setVarTrigger(null);
+    requestAnimationFrame(() => {
+      const pos = varTrigger.triggerStart + name.length + 4; // '{{' + name + '}}'
+      el?.setSelectionRange(pos, pos);
+      el?.focus();
+    });
+  };
+
+  const updateVarTrigger = (val: string, caret: number) => {
+    if (!enableVariables) return;
+    const trigger = findOpenVariableTrigger(val, caret);
+    setVarTrigger(trigger ? { ...trigger, highlightedIndex: 0 } : null);
+  };
+
+  const onTextareaKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (!varTrigger) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setVarTrigger((s) =>
+        s && varNames.length > 0 ? { ...s, highlightedIndex: (s.highlightedIndex + 1) % varNames.length } : s,
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setVarTrigger((s) =>
+        s && varNames.length > 0
+          ? { ...s, highlightedIndex: (s.highlightedIndex - 1 + varNames.length) % varNames.length }
+          : s,
+      );
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      if (varNames.length === 0) return;
+      e.preventDefault();
+      insertVariable(varNames[varTrigger.highlightedIndex]);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setVarTrigger(null);
+    }
+  };
+
+  const dropdown = varTrigger ? (
+    anchor && (
+      <VariableAutocomplete
+        names={varNames}
+        highlightedIndex={varTrigger.highlightedIndex}
+        x={anchor.left}
+        y={anchor.bottom + 4}
+        onSelect={insertVariable}
+        onHighlight={(i) => setVarTrigger((s) => (s ? { ...s, highlightedIndex: i } : s))}
+      />
+    )
+  ) : (
+    anchor &&
+    filtered.length > 0 && <SuggestionDropdown suggestions={filtered} anchor={anchor} onSelect={select} />
   );
 
   if (focused) {
@@ -119,9 +195,17 @@ function ExpandableValueCell({
           spellCheck={false}
           autoFocus
           rows={1}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            onChange(e.target.value);
+            updateVarTrigger(e.target.value, e.target.selectionStart ?? e.target.value.length);
+          }}
+          onSelect={(e) => updateVarTrigger(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)}
+          onKeyDown={onTextareaKeyDown}
           onFocus={(e) => setAnchor(e.currentTarget.getBoundingClientRect())}
-          onBlur={() => setFocused(false)}
+          onBlur={() => {
+            setFocused(false);
+            setVarTrigger(null);
+          }}
           className={cn(
             inputClass,
             'h-auto resize-none overflow-hidden whitespace-pre-wrap break-all py-1.5 font-mono leading-snug',
