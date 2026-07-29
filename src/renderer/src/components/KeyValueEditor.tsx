@@ -7,6 +7,7 @@ import { VariableInput } from './VariableInput';
 import { SuggestionDropdown } from './SuggestionDropdown';
 import { VariableAutocomplete } from './VariableAutocomplete';
 import { findOpenVariableTrigger } from '@/utils/variables';
+import { DYNAMIC_VARIABLE_NAMES } from '@/utils/fakeData';
 import { useActiveVariables } from '@/hooks/useActiveVariables';
 import { useFileStore, formDataFileKey } from '@/stores/fileStore';
 import { middleEllipsis } from '@/utils/format';
@@ -122,7 +123,9 @@ function ExpandableValueCell({
   const varNames = useMemo(() => {
     if (!varTrigger) return [];
     const q = varTrigger.query.toLowerCase();
-    return Object.keys(vars).filter((n) => n.toLowerCase().includes(q));
+    const real = Object.keys(vars).filter((n) => n.toLowerCase().includes(q));
+    const dynamic = DYNAMIC_VARIABLE_NAMES.filter((n) => n.toLowerCase().includes(q));
+    return [...real, ...dynamic];
   }, [varTrigger, vars]);
 
   const insertVariable = (name: string) => {
