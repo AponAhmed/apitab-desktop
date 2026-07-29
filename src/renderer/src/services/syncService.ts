@@ -145,6 +145,18 @@ function desiredSharedVariables(environments: Environment[]): Map<string, { key:
   return map;
 }
 
+/**
+ * ids currently mid-flight to the server. Guards `onEnvironmentsChanged`
+ * against firing a second concurrent push for the same id before the first
+ * resolves — without conflating "attempted" with "confirmed" the way
+ * optimistically pre-setting `pushedVariableVersions` used to: a failed
+ * create looked identical to a successful one afterward, so every future
+ * edit retried it as an *update* against a row that was never created — a
+ * 404 that never surfaces and never recovers. `pushedVariableVersions` now
+ * only ever changes on a confirmed server response (success or conflict).
+ */
+const pendingVariablePushes = new Set<string>();
+
 async function pushSharedVariableUpsert(
   teamId: string,
   id: string,
@@ -161,14 +173,21 @@ async function pushSharedVariableUpsert(
     pushedVariableVersions.set(id, { teamId, updatedAt: saved.updatedAt });
     useTeamVariablesStore.getState().upsertLocal(teamId, saved);
   } catch (err) {
-    if (err instanceof ConflictError) {
+    // A conflict response doesn't always carry `current` (e.g. the
+    // cross-team id-reuse case below rejects with just a message) — treat
+    // it the same as a network error rather than crash on a missing field.
+    if (err instanceof ConflictError && err.current) {
       // Same rule as collections: server wins, no merge UI.
       const current = err.current as TeamVariable;
       pushedVariableVersions.set(id, { teamId, updatedAt: current.updatedAt });
       useTeamVariablesStore.getState().upsertLocal(teamId, current);
       toast.info(`Shared variable "${current.key}" was updated elsewhere — synced the latest version.`);
     }
-    // Network/other errors: leave as-is; the next environment edit or poll retries.
+    // Otherwise: leave pushedVariableVersions untouched (still absent for a
+    // failed create) so the next environment edit or poll correctly retries
+    // as whichever operation it actually still needs to be.
+  } finally {
+    pendingVariablePushes.delete(id);
   }
 }
 
@@ -194,23 +213,32 @@ function onEnvironmentsChanged(
   const desired = desiredSharedVariables(state.environments);
 
   for (const [id, { key, value }] of desired) {
+    if (pendingVariablePushes.has(id)) continue; // already pushing this one — let it finish before re-evaluating
+
     const known = pushedVariableVersions.get(id);
     if (!known) {
-      pushedVariableVersions.set(id, { teamId, updatedAt: Date.now() }); // optimistic, avoids duplicate concurrent pushes
+      pendingVariablePushes.add(id);
       void pushSharedVariableUpsert(teamId, id, key, value, true);
       continue;
     }
     if (known.teamId !== teamId) {
       // Active team changed while still shared — move it: drop from the old
-      // team's pool, create fresh in the new one.
-      void pushSharedVariableDelete(known.teamId, id);
-      pushedVariableVersions.set(id, { teamId, updatedAt: Date.now() });
-      void pushSharedVariableUpsert(teamId, id, key, value, true);
+      // team's pool, then create fresh in the new one. Awaited in sequence
+      // (not fired concurrently) so the delete has actually landed before
+      // the create runs — the server rejects re-creating this id under a
+      // different team while the old copy is still active, only allowing
+      // it once that copy is confirmed gone.
+      pendingVariablePushes.add(id);
+      pushedVariableVersions.delete(id);
+      void (async () => {
+        await pushSharedVariableDelete(known.teamId, id).catch(() => {});
+        await pushSharedVariableUpsert(teamId, id, key, value, true);
+      })();
       continue;
     }
     const local = useTeamVariablesStore.getState().variablesByTeam[teamId]?.find((v) => v.id === id);
     if (!local || local.key !== key || local.value !== value) {
-      pushedVariableVersions.set(id, { teamId, updatedAt: Date.now() });
+      pendingVariablePushes.add(id);
       void pushSharedVariableUpsert(teamId, id, key, value, false);
     }
   }

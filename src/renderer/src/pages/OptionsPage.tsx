@@ -26,6 +26,7 @@ import { useEnvironmentStore } from '@/stores/environmentStore';
 import { useHistoryStore } from '@/stores/historyStore';
 import { useAccountStore } from '@/stores/accountStore';
 import { useTeamStore } from '@/stores/teamStore';
+import { useTeamVariablesStore } from '@/stores/teamVariablesStore';
 import { useDialogStore } from '@/stores/dialogStore';
 import { apiClient } from '@/services/apiClient';
 import { clearTeamCollectionsOnLogout, runAllTeamsSync } from '@/services/syncService';
@@ -125,6 +126,7 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
     }
     clearSession();
     resetTeams();
+    useTeamVariablesStore.getState().reset();
     clearTeamCollectionsOnLogout();
     toast.info('Logged out');
   };
