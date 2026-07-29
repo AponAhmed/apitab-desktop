@@ -12,8 +12,14 @@ import type { HttpMethod, PendingAssignment } from '@/types';
 
 const WIDTH = 320;
 
-/** A single pending-share offer: preview + Accept/Decline. */
-function AssignmentRow({ assignment }: { assignment: PendingAssignment }) {
+/**
+ * A single pending-share offer: preview + Accept/Decline. Exported so
+ * CollectionsPanel can surface the same accept flow inline in the sidebar —
+ * this bell's badge alone was easy to miss, leaving a team's shared
+ * collections invisible with no clue why (see CollectionsPanel.tsx's
+ * `pendingForActiveTeam`/per-group pending block).
+ */
+export function AssignmentRow({ assignment }: { assignment: PendingAssignment }) {
   const remove = usePendingAssignmentsStore((s) => s.remove);
   const [responding, setResponding] = useState(false);
 

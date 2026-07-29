@@ -7,6 +7,7 @@ import {
   FilePlus2,
   Folder,
   FolderPlus,
+  Inbox,
   Pencil,
   Play,
   Plus,
@@ -26,6 +27,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useUiStore } from '@/stores/uiStore';
 import { useDialogStore } from '@/stores/dialogStore';
 import { useRunnerStore } from '@/stores/runnerStore';
+import { usePendingAssignmentsStore } from '@/stores/pendingAssignmentsStore';
 import { toast } from '@/stores/toastStore';
 import { unshareCollection } from '@/services/syncService';
 import { IconButton } from '@/components/ui/IconButton';
@@ -34,6 +36,7 @@ import { MethodBadge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PromptDialog } from '@/components/PromptDialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { AssignmentRow } from '@/components/PendingAssignmentsBell';
 import { ShareToTeamDialog } from './ShareToTeamDialog';
 import { RunnerPanel } from '@/features/runner/RunnerPanel';
 import { cn } from '@/utils/cn';
@@ -462,6 +465,7 @@ export function CollectionsPanel() {
   const teams = useTeamStore((s) => s.teams);
   const activeTeamId = useTeamStore((s) => s.activeTeamId);
   const setActiveTeam = useTeamStore((s) => s.setActiveTeam);
+  const pendingAssignments = usePendingAssignmentsStore((s) => s.assignments);
   const currentUserId = useAccountStore((s) => s.session?.user.id ?? null);
   const personalWorkspaceName = useSettingsStore((s) => s.personalWorkspaceName);
   const setPersonalWorkspaceName = useSettingsStore((s) => s.setPersonalWorkspaceName);
@@ -521,6 +525,20 @@ export function CollectionsPanel() {
   const visibleGroups = useMemo(
     () => groups.filter((g) => g.key === 'orphaned' || g.key === activeWorkspaceKey),
     [groups, activeWorkspaceKey],
+  );
+
+  // Sharing a collection with a team only grants the *sharer* an immediate
+  // 'accepted' assignment — every other member gets a 'pending' one that
+  // needs an explicit Accept before it's pulled into their `collections`
+  // (see server SyncController). groupByWorkspace only creates a group when
+  // a team has at least one already-accepted collection, so a team with
+  // ONLY pending shares produces no group at all — the sidebar then falls
+  // back to a generic "No collections" empty state with zero indication
+  // anything is waiting. Surface pending shares directly in the sidebar
+  // (not just the easy-to-miss topbar bell) so that's never a silent dead end.
+  const pendingForActiveTeam = useMemo(
+    () => (activeTeamId ? pendingAssignments.filter((a) => a.teamId === activeTeamId) : []),
+    [pendingAssignments, activeTeamId],
   );
 
   // Memoized so its identity only changes when one of its actual inputs
@@ -678,12 +696,29 @@ export function CollectionsPanel() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-1 pb-2">
-        {visibleGroups.length === 0 ? (
+        {visibleGroups.length === 0 && pendingForActiveTeam.length === 0 ? (
           <EmptyState
             icon={Folder}
             title={q ? 'No matches' : 'No collections'}
             description={q ? undefined : 'Save a request or import a collection to get started.'}
           />
+        ) : visibleGroups.length === 0 ? (
+          // This team has only pending shares — no accepted collection yet,
+          // so groupByWorkspace produced no group to attach them to. Show
+          // the accept flow directly instead of a misleading "No collections".
+          <div>
+            <EmptyState
+              icon={Inbox}
+              title={`${pendingForActiveTeam.length} shared collection${pendingForActiveTeam.length === 1 ? '' : 's'} awaiting your approval`}
+              description="Accept below to add them to this workspace."
+              className="pb-3"
+            />
+            <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 dark:divide-slate-700/60 dark:border-slate-700">
+              {pendingForActiveTeam.map((a) => (
+                <AssignmentRow key={a.id} assignment={a} />
+              ))}
+            </ul>
+          </div>
         ) : (
           <ActionsContext.Provider value={actions}>
           <DragContext.Provider value={dragContextValue}>
@@ -739,6 +774,17 @@ export function CollectionsPanel() {
                     />
                   ))}
                 </div>
+                {group.key === activeTeamId && pendingForActiveTeam.length > 0 && (
+                  // A newer collection shared into a team this member already
+                  // has other accepted collections from — acceptance is
+                  // per-collection, so this can appear even for an
+                  // established member (see comment on pendingForActiveTeam).
+                  <ul className="mt-1.5 divide-y divide-slate-100 rounded-lg border border-slate-200 dark:divide-slate-700/60 dark:border-slate-700">
+                    {pendingForActiveTeam.map((a) => (
+                      <AssignmentRow key={a.id} assignment={a} />
+                    ))}
+                  </ul>
+                )}
               </div>
             ))}
           </DragContext.Provider>
