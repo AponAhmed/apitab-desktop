@@ -19,6 +19,8 @@ interface UiState {
   setSidebarWidth: (width: number) => void;
   setResponseHeight: (height: number) => void;
   toggleContainerCollapsed: (id: string) => void;
+  /** Explicitly opens a folder/collection — unlike toggle, safe to call when it's already expanded. */
+  expandContainer: (id: string) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -38,6 +40,8 @@ export const useUiStore = create<UiState>()(
         set({ responseHeight: Math.max(120, Math.min(900, responseHeight)) }),
       toggleContainerCollapsed: (id) =>
         set((s) => ({ collapsedContainers: { ...s.collapsedContainers, [id]: !s.collapsedContainers[id] } })),
+      expandContainer: (id) =>
+        set((s) => (s.collapsedContainers[id] ? { collapsedContainers: { ...s.collapsedContainers, [id]: false } } : s)),
     }),
     { name: 'apitab:ui', storage: createJSONStorage(() => browserLocalStorage) },
   ),
