@@ -12,6 +12,7 @@ import { cn } from '@/utils/cn';
 import { findOpenVariableTrigger, tokenizeVariables, type VarSegment } from '@/utils/variables';
 import { findPathVariableRanges } from '@/utils/query';
 import { useActiveVariables } from '@/hooks/useActiveVariables';
+import { isDynamicVariable, DYNAMIC_VARIABLE_NAMES } from '@/utils/fakeData';
 import { VariablePopover } from './VariablePopover';
 import { VariableAutocomplete } from './VariableAutocomplete';
 
@@ -116,7 +117,9 @@ export function VariableInput({
   const autocompleteNames = useMemo(() => {
     if (!autocomplete) return [];
     const q = autocomplete.query.toLowerCase();
-    return Object.keys(vars).filter((name) => name.toLowerCase().includes(q));
+    const real = Object.keys(vars).filter((name) => name.toLowerCase().includes(q));
+    const dynamic = DYNAMIC_VARIABLE_NAMES.filter((name) => name.toLowerCase().includes(q));
+    return [...real, ...dynamic];
   }, [autocomplete, vars]);
 
   const syncScroll = () => {
@@ -151,7 +154,11 @@ export function VariableInput({
 
     let found: ActiveVar | null = null;
     for (const seg of segments) {
-      if (seg.type !== 'var' || !seg.name) continue;
+      // Dynamic ($-prefixed) variables have no "set a value in an
+      // environment" concept — they always regenerate — so skip the
+      // hover-to-edit popover for them entirely rather than show a
+      // misleading "unset" editor for something that isn't a real variable.
+      if (seg.type !== 'var' || !seg.name || isDynamicVariable(seg.name)) continue;
       const left = measureText(value.slice(0, seg.start), font);
       const right = measureText(value.slice(0, seg.end), font);
       if (x >= left && x <= right) {
@@ -260,7 +267,9 @@ export function VariableInput({
             ) : (
               renderSegments.map((seg) => {
                 if (seg.kind === 'var') {
-                  const hasValue = seg.varName && Object.prototype.hasOwnProperty.call(vars, seg.varName);
+                  const hasValue =
+                    seg.varName &&
+                    (Object.prototype.hasOwnProperty.call(vars, seg.varName) || isDynamicVariable(seg.varName));
                   return (
                     <span
                       key={seg.key}

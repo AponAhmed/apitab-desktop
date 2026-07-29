@@ -1,18 +1,25 @@
+import { isDynamicVariable, generateDynamicValue } from './fakeData';
+
 /**
  * Environment variable interpolation. Variables use the `{{name}}` syntax,
- * e.g. `{{base_url}}/users`.
+ * e.g. `{{base_url}}/users`. Names starting with `$` (e.g. `{{$guid}}`) are
+ * reserved for the built-in fake-data generators in fakeData.ts — the `$`
+ * keeps them from ever colliding with a real environment variable of a
+ * common name like `email` or `name`.
  */
 
-export const VARIABLE_PATTERN = /\{\{\s*([\w.-]+)\s*\}\}/g;
+export const VARIABLE_PATTERN = /\{\{\s*([\w$.-]+)\s*\}\}/g;
 
 export type VariableMap = Record<string, string>;
 
 /** Replaces every `{{name}}` occurrence with its value (unknown names are kept). */
 export function resolveString(input: string, vars: VariableMap): string {
   if (!input || input.indexOf('{{') === -1) return input;
-  return input.replace(VARIABLE_PATTERN, (match, name: string) =>
-    Object.prototype.hasOwnProperty.call(vars, name) ? vars[name] : match,
-  );
+  return input.replace(VARIABLE_PATTERN, (match, name: string) => {
+    if (Object.prototype.hasOwnProperty.call(vars, name)) return vars[name];
+    if (isDynamicVariable(name)) return generateDynamicValue(name) ?? match;
+    return match;
+  });
 }
 
 /** Returns the distinct variable names referenced in the input. */
@@ -86,6 +93,6 @@ export function findOpenVariableTrigger(text: string, caret: number): OpenVariab
   if (openIdx === -1) return null;
   const between = slice.slice(openIdx + 2);
   if (between.includes('}}') || between.includes('{{')) return null;
-  if (!/^\s*[\w.-]*$/.test(between)) return null;
+  if (!/^\s*[\w$.-]*$/.test(between)) return null;
   return { triggerStart: from + openIdx, query: between.trim() };
 }
