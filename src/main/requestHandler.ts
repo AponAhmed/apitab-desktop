@@ -1,4 +1,16 @@
+import { Agent, setGlobalDispatcher } from 'undici';
 import type { ApiError, PreparedRequest, RequestResult, ResponseHeader } from '@shared/types';
+
+// Node's fetch (undici) defaults to a ~4s keep-alive timeout on pooled
+// connections — shorter than the gap between two manually-clicked "Send"s
+// in normal use, so every request was paying a full DNS+TCP+TLS handshake
+// (measured 400-600ms+ to a typical HTTPS API) instead of reusing the
+// connection from the previous request (measured ~60-90ms warm), the actual
+// cause of ApiTab feeling slower than tools like Postman that keep
+// connections alive longer. Widening the pool's timeout — once, for the
+// whole process — fixes every request through `fetch()` below, not just
+// this module's own calls.
+setGlobalDispatcher(new Agent({ keepAliveTimeout: 60_000, keepAliveMaxTimeout: 120_000 }));
 
 function classifyError(err: unknown): ApiError {
   if (err instanceof DOMException && err.name === 'AbortError') {
