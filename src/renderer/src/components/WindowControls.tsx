@@ -18,7 +18,14 @@ export function WindowControls() {
   if (window.api.platform === 'darwin') return null;
 
   return (
-    <div className="flex h-full items-stretch [-webkit-app-region:no-drag]">
+    // Stops a double-click on these buttons from also bubbling up to the
+    // TopBar header's onDoubleClick (toggleMaximize) — no-drag only exempts
+    // this region from the OS-level drag/maximize hit-testing, not from a
+    // plain JS event bubbling through it. Most visible on the maximize
+    // button itself: without this, a double-click would toggle twice
+    // (once via this button's own onClick firing twice, once via the
+    // bubbled header handler) instead of once.
+    <div className="flex h-full items-stretch [-webkit-app-region:no-drag]" onDoubleClick={(e) => e.stopPropagation()}>
       <button type="button" className={BASE} title="Minimize" aria-label="Minimize" onClick={minimize}>
         <Minus className="h-4 w-4" />
       </button>

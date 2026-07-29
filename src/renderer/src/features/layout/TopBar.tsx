@@ -17,7 +17,7 @@ import { useWindowControls } from '@/hooks/useWindowControls';
 
 /** Shared "clustered & bordered" pill styling for the context/utility control groups. */
 const CLUSTER =
-  'flex items-center gap-0.5 rounded-lg border border-slate-200 bg-slate-50 px-1 py-0.5 dark:border-slate-800 dark:bg-white/[0.04]';
+  'flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 dark:border-slate-800 dark:bg-white/[0.04]';
 
 const THEME_ICONS = { light: Sun, dark: Moon, system: Monitor } as const;
 const THEME_ORDER = ['light', 'dark', 'system'] as const;
@@ -52,7 +52,14 @@ export function TopBar() {
     // titleBarStyle: 'hidden' on macOS — see main/index.ts). Every
     // interactive child below opts back out with no-drag, since a drag
     // region swallows clicks on anything inside it. Double-click-to-maximize
-    // is native title-bar behavior a frameless window doesn't get for free.
+    // is native title-bar behavior a frameless window doesn't get for free,
+    // wired up manually below via onDoubleClick. `-webkit-app-region:
+    // no-drag` only opts a region out of the OS-level drag/maximize
+    // hit-testing — it has no effect on this React onDoubleClick handler,
+    // which is a JS listener that still receives every bubbled DOM event
+    // regardless of app-region. Each no-drag wrapper below also stops that
+    // bubbling explicitly, so double-clicking a control inside it (e.g. the
+    // environment/workspace selectors) doesn't also toggle the window.
     <header
       className="flex h-11 shrink-0 items-stretch border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0f111a] [-webkit-app-region:drag]"
       style={{
@@ -64,7 +71,7 @@ export function TopBar() {
           set via trafficLightPosition in main/index.ts) so the sidebar
           toggle/logo don't sit underneath them. */}
       <div className={cn('flex flex-1 items-center gap-1.5 pr-2.5', isMac ? 'pl-20' : 'pl-2.5')}>
-        <div className="[-webkit-app-region:no-drag]">
+        <div className="[-webkit-app-region:no-drag]" onDoubleClick={(e) => e.stopPropagation()}>
           <IconButton size="sm" title="Toggle sidebar" aria-label="Toggle sidebar" onClick={toggleSidebar}>
             <PanelLeft className="h-4 w-4" />
           </IconButton>
@@ -79,7 +86,10 @@ export function TopBar() {
 
         <div className="flex-1" />
 
-        <div className="mr-1.5 flex items-center gap-1.5 [-webkit-app-region:no-drag]">
+        <div
+          className="mr-1.5 flex items-center gap-1.5 [-webkit-app-region:no-drag]"
+          onDoubleClick={(e) => e.stopPropagation()}
+        >
           {/* Context: what you're working in. */}
           <div className={CLUSTER}>
             <EnvironmentSelector />
@@ -102,7 +112,7 @@ export function TopBar() {
           </div>
         </div>
 
-        <div className="[-webkit-app-region:no-drag]">
+        <div className="[-webkit-app-region:no-drag]" onDoubleClick={(e) => e.stopPropagation()}>
           <AccountAvatar />
         </div>
       </div>
