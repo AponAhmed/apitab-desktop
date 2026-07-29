@@ -18,6 +18,48 @@ import { cn } from '@/utils/cn';
 
 const NEW_TEAM = '__new_team__';
 
+/**
+ * The account's real picture (currently only set via Google sign-in — see
+ * AuthController::userPayload on the server) when available, falling back
+ * to an initial-letter circle otherwise. Also falls back on a load error:
+ * Google's photo URLs are hotlink-protected in some configurations and can
+ * occasionally 403/404, and this must never leave the account menu blank.
+ */
+function AccountAvatarImage({
+  avatar,
+  initial,
+  size,
+}: {
+  avatar?: string | null;
+  initial: string;
+  size: 'sm' | 'md';
+}) {
+  const [errored, setErrored] = useState(false);
+  const dims = size === 'sm' ? 'h-6 w-6 text-xs' : 'h-8 w-8 text-sm';
+
+  if (avatar && !errored) {
+    return (
+      <img
+        src={avatar}
+        alt=""
+        referrerPolicy="no-referrer"
+        className={cn('shrink-0 rounded-full object-cover', dims)}
+        onError={() => setErrored(true)}
+      />
+    );
+  }
+  return (
+    <span
+      className={cn(
+        'flex shrink-0 items-center justify-center rounded-full bg-brand-500 font-semibold text-white',
+        dims,
+      )}
+    >
+      {initial}
+    </span>
+  );
+}
+
 export function TeamSelector() {
   const teams = useTeamStore((s) => s.teams);
   const activeTeamId = useTeamStore((s) => s.activeTeamId);
@@ -143,9 +185,7 @@ export function AccountAvatar() {
         className="flex items-center gap-1.5 rounded-full py-1 pl-1 pr-1.5 text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
         aria-label="Account menu"
       >
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500 text-xs font-semibold text-white">
-          {initial}
-        </span>
+        <AccountAvatarImage avatar={session.user.avatar} initial={initial} size="sm" />
         <span className="max-w-[7rem] truncate text-xs font-medium">{session.user.name}</span>
         <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform', open && 'rotate-180')} />
       </button>
@@ -161,9 +201,7 @@ export function AccountAvatar() {
             >
               <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700/50 mb-1">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-500 text-sm font-semibold text-white shrink-0">
-                    {initial}
-                  </div>
+                  <AccountAvatarImage avatar={session.user.avatar} initial={initial} size="md" />
                   <div className="flex flex-col min-w-0">
                     <span className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{session.user.name}</span>
                     <span className="truncate text-xs text-slate-500 dark:text-slate-400">{session.user.email}</span>

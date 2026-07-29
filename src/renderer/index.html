@@ -6,10 +6,14 @@
          backend (config/server.ts's API_BASE_URL) — 'self' alone (the
          default-src fallback) blocks cross-origin fetch entirely. Actual API
          testing requests don't need this: those go through window.api.request.send
-         to the main process, which has no CSP. -->
+         to the main process, which has no CSP. img-src covers the account
+         avatar (AccountMenu.tsx) — Google's sign-in profile photo is hosted
+         on googleusercontent.com, and 'self' alone (the default-src
+         fallback) blocks any image not bundled with the app, silently
+         falling back to the initial-letter avatar with no visible error. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: http://127.0.0.1:* http://localhost:*;"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: http://127.0.0.1:* http://localhost:*; img-src 'self' https: data:;"
     />
     <title>ApiTab</title>
   </head>
