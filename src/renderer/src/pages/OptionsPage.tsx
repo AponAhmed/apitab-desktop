@@ -97,7 +97,6 @@ function SectionHeader({ title, description }: { title: string; description?: st
 export function OptionsPage({ onClose }: { onClose?: () => void }) {
   useApplyTheme();
   const [section, setSection] = useState<SectionId>('general');
-  const isMac = window.api.platform === 'darwin';
 
   const [version, setVersion] = useState('');
   useEffect(() => {
@@ -169,16 +168,26 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
     location.reload();
   };
 
+  useEffect(() => {
+    if (!onClose) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   return (
-    <div className="flex h-screen bg-white text-slate-800 dark:bg-[#0f111a] dark:text-slate-200">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-slate-200 dark:border-slate-800">
-        {/* On macOS the native traffic-light buttons (main/index.ts's
-            trafficLightPosition) sit at a fixed window-level position —
-            they aren't part of this page's DOM, so nothing here naturally
-            avoids them the way TopBar.tsx's own layout does. This overlay
-            covers TopBar entirely, so without extra top padding here the
-            traffic lights render directly over the logo/title below. */}
-        <div className={cn('flex items-center gap-2.5 px-5 py-5', isMac && 'pt-11')}>
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-slate-900/40 p-4 backdrop-blur-sm"
+      onMouseDown={onClose}
+    >
+      <div
+        onMouseDown={(e) => e.stopPropagation()}
+        className="flex max-h-[80vh] w-[90vw] min-w-[800px] max-w-5xl overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xl dark:border-slate-700 dark:bg-[#0f111a] dark:text-slate-200"
+      >
+      <aside className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-2.5 px-5 py-5">
           <Logo className="h-8 w-8" />
           <div className="min-w-0">
             <h1 className="text-sm font-bold leading-tight text-slate-900 dark:text-slate-100">
@@ -452,17 +461,6 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
                     </span>
                     <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                   </a>
-
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {ABOUT.techStack.map((t) => (
-                      <span
-                        key={t}
-                        className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                      >
-                        {t}
-                      </span>
-                    ))}
-                  </div>
                 </div>
 
                 <div>
@@ -487,6 +485,7 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
           )}
         </div>
       </main>
+      </div>
 
       <ConfirmDialog
         open={clearOpen}

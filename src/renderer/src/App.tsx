@@ -10,11 +10,7 @@ export default function App() {
   return (
     <>
       <Workspace />
-      {settingsOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50 dark:bg-slate-950">
-          <OptionsPage onClose={closeSettings} />
-        </div>
-      )}
+      {settingsOpen && <OptionsPage onClose={closeSettings} />}
       <WhatsNewDialog />
     </>
   );
