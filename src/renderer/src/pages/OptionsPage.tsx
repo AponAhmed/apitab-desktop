@@ -184,7 +184,7 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
     >
       <div
         onMouseDown={(e) => e.stopPropagation()}
-        className="flex max-h-[80vh] w-[90vw] min-w-[800px] max-w-5xl overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xl dark:border-slate-700 dark:bg-[#0f111a] dark:text-slate-200"
+        className="flex h-[80vh] w-[90vw] min-w-[800px] max-w-5xl overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800 shadow-2xl dark:border-slate-700 dark:bg-[#0f111a] dark:text-slate-200"
       >
       <aside className="flex w-64 shrink-0 flex-col overflow-y-auto border-r border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-2.5 px-5 py-5">
