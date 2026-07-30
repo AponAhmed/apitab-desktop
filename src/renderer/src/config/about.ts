@@ -41,7 +41,5 @@ export const ABOUT = {
     { label: 'Browser extension repo', url: SIBLING_REPO_URL },
   ] satisfies AboutLink[],
 
-  techStack: ['WXT', 'React', 'TypeScript', 'Tailwind CSS', 'Zustand'],
-
   license: 'MIT',
 };

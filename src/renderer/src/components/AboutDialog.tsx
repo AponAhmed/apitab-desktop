@@ -143,17 +143,6 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
           </div>
         </section>
 
-        <div className="flex flex-wrap gap-1.5">
-          {ABOUT.techStack.map((t) => (
-            <span
-              key={t}
-              className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-            >
-              {t}
-            </span>
-          ))}
-        </div>
-
         <p className="text-center text-[11px] text-slate-400">
           {ABOUT.license} Licensed · Made with ⚡ for developers
         </p>
