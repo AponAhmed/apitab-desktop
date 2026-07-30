@@ -91,10 +91,24 @@ function createWindow(): void {
   mainWindow.on('maximize', () => mainWindow.webContents.send('window:maximized-change', true));
   mainWindow.on('unmaximize', () => mainWindow.webContents.send('window:maximized-change', false));
 
-  // Open links clicked inside the app in the OS browser, not a new Electron window.
+  // Open links clicked inside the app in the OS browser, not a new Electron
+  // window (target="_blank" links, e.g. AboutDialog's) or the same window
+  // (a plain <a href> with no target — e.g. the "Full Changelog" link in
+  // What's New release notes, rendered from GitHub's own HTML — which
+  // otherwise navigates this window itself to github.com instead of
+  // opening a browser, replacing the whole app UI with GitHub's page).
+  // will-navigate only fires for a navigation the page itself initiates
+  // (a link click, `location.href = ...`), never for this window's own
+  // programmatic loadURL/loadFile below — this SPA has no legitimate
+  // reason to navigate itself away at all, so unconditionally redirecting
+  // every one externally is correct, not just a same-origin carve-out.
   mainWindow.webContents.setWindowOpenHandler((details) => {
     void shell.openExternal(details.url);
     return { action: 'deny' };
+  });
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    event.preventDefault();
+    void shell.openExternal(url);
   });
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
