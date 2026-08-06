@@ -1,5 +1,6 @@
 import { useUiStore } from '@/stores/uiStore';
 import { useApplyTheme } from '@/hooks/useApplyTheme';
+import { useApplyAccentColor } from '@/hooks/useApplyAccentColor';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useRequestActions } from '@/hooks/useRequestActions';
 import { usePanelResize, useHorizontalResize } from '@/hooks/usePanelResize';
@@ -18,6 +19,7 @@ import { Toaster } from '@/components/Toaster';
 
 export function Workspace() {
   useApplyTheme();
+  useApplyAccentColor();
   useTeamSync();
   useAnalyticsSession();
   useAutoSaveRequest();
