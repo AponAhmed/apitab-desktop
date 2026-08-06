@@ -35,7 +35,7 @@ export const ABOUT = {
 
   contributors: [
     {
-      name: 'Anisur Rahman Shahin',
+      name: 'AR-Shahin',
       role: 'Contributor',
       github: 'https://github.com/AR-Shahin',
     },
