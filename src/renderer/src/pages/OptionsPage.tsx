@@ -297,7 +297,7 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
                             key={preset.name}
                             type="button"
                             title={preset.name}
-                            onClick={() => setAccentColor(preset.hex)}
+                            onClick={() => setAccentColor(preset.hex && normalizeHex(preset.hex))}
                             className={cn(
                               'grid h-7 w-7 place-items-center rounded-full ring-offset-2 ring-offset-white transition-shadow dark:ring-offset-slate-900',
                               active && 'ring-2 ring-slate-800 dark:ring-slate-200',

@@ -33,7 +33,13 @@ export const ABOUT = {
     github: 'https://github.com/AponAhmed',
   } satisfies Person,
 
-  contributors: [] as Person[],
+  contributors: [
+    {
+      name: 'Anisur Rahman Shahin',
+      role: 'Contributor',
+      github: 'https://github.com/AR-Shahin',
+    },
+  ] satisfies Person[],
 
   links: [
     { label: 'Source code', url: REPO_URL },
