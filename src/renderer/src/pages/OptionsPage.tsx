@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-<<<<<<< HEAD
 import {
+  Check,
   Database,
   Download,
   ExternalLink,
@@ -13,6 +13,7 @@ import {
   Monitor,
   Moon,
   RefreshCw,
+  RotateCcw,
   Settings as SettingsIcon,
   Sun,
   Trash2,
@@ -20,9 +21,6 @@ import {
   Users,
   X,
 } from 'lucide-react';
-=======
-import { ArrowLeft, Check, Download, KeyRound, LogIn, LogOut, Monitor, Moon, RefreshCw, RotateCcw, Sun, Trash2, Upload, Users } from 'lucide-react';
->>>>>>> 35b0083... feat: implement dynamic accent color selection and systemic re-theming via CSS custom properties
 import { useApplyTheme } from '@/hooks/useApplyTheme';
 import { useApplyAccentColor } from '@/hooks/useApplyAccentColor';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -117,11 +115,8 @@ function SectionHeader({ title, description }: { title: string; description?: st
 
 export function OptionsPage({ onClose }: { onClose?: () => void }) {
   useApplyTheme();
-<<<<<<< HEAD
   const [section, setSection] = useState<SectionId>('general');
-=======
   useApplyAccentColor();
->>>>>>> 35b0083... feat: implement dynamic accent color selection and systemic re-theming via CSS custom properties
 
   const [version, setVersion] = useState('');
   useEffect(() => {
@@ -226,7 +221,6 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
           </div>
         </div>
 
-<<<<<<< HEAD
         <nav className="flex-1 space-y-0.5 px-3">
           {NAV_ITEMS.map((item) => (
             <button
@@ -244,109 +238,6 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
             </button>
           ))}
         </nav>
-=======
-        <div className="space-y-4">
-          <Section title="Appearance">
-            <div className="flex gap-2">
-              {THEMES.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTheme(t.id)}
-                  className={cn(
-                    'flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
-                    theme === t.id
-                      ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800',
-                  )}
-                >
-                  <t.icon className="h-4 w-4" />
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
-              <span className="mb-2 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                Accent color
-              </span>
-              <div className="flex flex-wrap items-center gap-2">
-                {ACCENT_PRESETS.map((preset) => {
-                  const active = preset.hex === null ? accentColor === null : accentColor?.toLowerCase() === preset.hex;
-                  return (
-                    <button
-                      key={preset.name}
-                      type="button"
-                      title={preset.name}
-                      onClick={() => setAccentColor(preset.hex)}
-                      className={cn(
-                        'grid h-7 w-7 place-items-center rounded-full ring-offset-2 ring-offset-white transition-shadow dark:ring-offset-slate-900',
-                        active && 'ring-2 ring-slate-800 dark:ring-slate-200',
-                      )}
-                      style={{ backgroundColor: preset.hex ?? DEFAULT_ACCENT_HEX }}
-                    >
-                      {active && <Check className="h-3.5 w-3.5 text-white drop-shadow" />}
-                    </button>
-                  );
-                })}
-
-                <label
-                  title="Custom color"
-                  className="relative grid h-7 w-7 cursor-pointer place-items-center overflow-hidden rounded-full border border-dashed border-slate-300 bg-[conic-gradient(red,yellow,lime,cyan,blue,magenta,red)] dark:border-slate-600"
-                >
-                  <input
-                    type="color"
-                    value={normalizeHex(accentColor ?? '') ?? DEFAULT_ACCENT_HEX}
-                    onChange={(e) => setAccentColor(normalizeHex(e.target.value))}
-                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                  />
-                </label>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  title="Reset to the default accent color"
-                  disabled={accentColor === null}
-                  onClick={() => setAccentColor(null)}
-                  className="ml-auto shrink-0"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Reset
-                </Button>
-              </div>
-            </div>
-          </Section>
-
-          <Section title="Requests">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                  Request timeout (seconds)
-                </span>
-                <Input
-                  type="number"
-                  min={1}
-                  max={600}
-                  value={Math.round(timeoutMs / 1000)}
-                  onChange={(e) =>
-                    setRequestTimeout(Math.max(1, Number(e.target.value) || 1) * 1000)
-                  }
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
-                  History limit (entries)
-                </span>
-                <Input
-                  type="number"
-                  min={1}
-                  max={1000}
-                  value={historyLimit}
-                  onChange={(e) => setHistoryLimit(Math.max(1, Number(e.target.value) || 1))}
-                />
-              </label>
-            </div>
-          </Section>
->>>>>>> 35b0083... feat: implement dynamic accent color selection and systemic re-theming via CSS custom properties
 
         <div className="px-5 py-4 text-xs text-slate-400 dark:text-slate-500">
           ApiTab v{version} · {ABOUT.license} License
@@ -389,6 +280,59 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
                         {t.label}
                       </button>
                     ))}
+                  </div>
+
+                  <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                    <span className="mb-2 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                      Accent color
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {ACCENT_PRESETS.map((preset) => {
+                        const active =
+                          preset.hex === null
+                            ? accentColor === null
+                            : accentColor?.toLowerCase() === preset.hex;
+                        return (
+                          <button
+                            key={preset.name}
+                            type="button"
+                            title={preset.name}
+                            onClick={() => setAccentColor(preset.hex)}
+                            className={cn(
+                              'grid h-7 w-7 place-items-center rounded-full ring-offset-2 ring-offset-white transition-shadow dark:ring-offset-slate-900',
+                              active && 'ring-2 ring-slate-800 dark:ring-slate-200',
+                            )}
+                            style={{ backgroundColor: preset.hex ?? DEFAULT_ACCENT_HEX }}
+                          >
+                            {active && <Check className="h-3.5 w-3.5 text-white drop-shadow" />}
+                          </button>
+                        );
+                      })}
+
+                      <label
+                        title="Custom color"
+                        className="relative grid h-7 w-7 cursor-pointer place-items-center overflow-hidden rounded-full border border-dashed border-slate-300 bg-[conic-gradient(red,yellow,lime,cyan,blue,magenta,red)] dark:border-slate-600"
+                      >
+                        <input
+                          type="color"
+                          value={normalizeHex(accentColor ?? '') ?? DEFAULT_ACCENT_HEX}
+                          onChange={(e) => setAccentColor(normalizeHex(e.target.value))}
+                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        />
+                      </label>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Reset to the default accent color"
+                        disabled={accentColor === null}
+                        onClick={() => setAccentColor(null)}
+                        className="ml-auto shrink-0"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Reset
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
