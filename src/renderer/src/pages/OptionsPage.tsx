@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  Check,
   Database,
   Download,
   ExternalLink,
@@ -12,6 +13,7 @@ import {
   Monitor,
   Moon,
   RefreshCw,
+  RotateCcw,
   Settings as SettingsIcon,
   Sun,
   Trash2,
@@ -20,6 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import { useApplyTheme } from '@/hooks/useApplyTheme';
+import { useApplyAccentColor } from '@/hooks/useApplyAccentColor';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useCollectionStore } from '@/stores/collectionStore';
 import { useEnvironmentStore } from '@/stores/environmentStore';
@@ -48,6 +51,7 @@ import {
   readFileAsText,
 } from '@/services/backup';
 import { cn } from '@/utils/cn';
+import { normalizeHex } from '@/utils/colorScale';
 import type { ThemeMode } from '@/types';
 
 type SectionId = 'general' | 'account' | 'data' | 'about';
@@ -64,6 +68,21 @@ const THEMES: { id: ThemeMode; label: string; icon: typeof Sun }[] = [
   { id: 'dark', label: 'Dark', icon: Moon },
   { id: 'system', label: 'System', icon: Monitor },
 ];
+
+/** `hex: null` is the app's built-in default amber palette (shown at its actual color). */
+const ACCENT_PRESETS: { name: string; hex: string | null }[] = [
+  { name: 'Default', hex: null },
+  { name: 'Blue', hex: '#3b82f6' },
+  { name: 'Indigo', hex: '#6366f1' },
+  { name: 'Purple', hex: '#8b5cf6' },
+  { name: 'Pink', hex: '#ec4899' },
+  { name: 'Red', hex: '#ef4444' },
+  { name: 'Orange', hex: '#f97316' },
+  { name: 'Green', hex: '#22c55e' },
+  { name: 'Teal', hex: '#14b8a6' },
+  { name: 'Cyan', hex: '#06b6d4' },
+];
+const DEFAULT_ACCENT_HEX = '#f59e0b';
 
 const SHORTCUTS = [
   ['Send request', 'Ctrl + Enter'],
@@ -97,6 +116,7 @@ function SectionHeader({ title, description }: { title: string; description?: st
 export function OptionsPage({ onClose }: { onClose?: () => void }) {
   useApplyTheme();
   const [section, setSection] = useState<SectionId>('general');
+  useApplyAccentColor();
 
   const [version, setVersion] = useState('');
   useEffect(() => {
@@ -104,6 +124,8 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
   }, []);
   const theme = useSettingsStore((s) => s.theme);
   const setTheme = useSettingsStore((s) => s.setTheme);
+  const accentColor = useSettingsStore((s) => s.accentColor);
+  const setAccentColor = useSettingsStore((s) => s.setAccentColor);
   const timeoutMs = useSettingsStore((s) => s.requestTimeoutMs);
   const setRequestTimeout = useSettingsStore((s) => s.setRequestTimeout);
   const historyLimit = useSettingsStore((s) => s.historyLimit);
@@ -258,6 +280,59 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
                         {t.label}
                       </button>
                     ))}
+                  </div>
+
+                  <div className="mt-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+                    <span className="mb-2 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                      Accent color
+                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {ACCENT_PRESETS.map((preset) => {
+                        const active =
+                          preset.hex === null
+                            ? accentColor === null
+                            : accentColor?.toLowerCase() === preset.hex;
+                        return (
+                          <button
+                            key={preset.name}
+                            type="button"
+                            title={preset.name}
+                            onClick={() => setAccentColor(preset.hex)}
+                            className={cn(
+                              'grid h-7 w-7 place-items-center rounded-full ring-offset-2 ring-offset-white transition-shadow dark:ring-offset-slate-900',
+                              active && 'ring-2 ring-slate-800 dark:ring-slate-200',
+                            )}
+                            style={{ backgroundColor: preset.hex ?? DEFAULT_ACCENT_HEX }}
+                          >
+                            {active && <Check className="h-3.5 w-3.5 text-white drop-shadow" />}
+                          </button>
+                        );
+                      })}
+
+                      <label
+                        title="Custom color"
+                        className="relative grid h-7 w-7 cursor-pointer place-items-center overflow-hidden rounded-full border border-dashed border-slate-300 bg-[conic-gradient(red,yellow,lime,cyan,blue,magenta,red)] dark:border-slate-600"
+                      >
+                        <input
+                          type="color"
+                          value={normalizeHex(accentColor ?? '') ?? DEFAULT_ACCENT_HEX}
+                          onChange={(e) => setAccentColor(normalizeHex(e.target.value))}
+                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                        />
+                      </label>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Reset to the default accent color"
+                        disabled={accentColor === null}
+                        onClick={() => setAccentColor(null)}
+                        className="ml-auto shrink-0"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        Reset
+                      </Button>
+                    </div>
                   </div>
                 </div>
 

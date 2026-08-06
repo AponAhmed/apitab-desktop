@@ -8,6 +8,7 @@ interface SettingsState extends Settings {
   setRequestTimeout: (ms: number) => void;
   setHistoryLimit: (limit: number) => void;
   setPersonalWorkspaceName: (name: string) => void;
+  setAccentColor: (hex: string | null) => void;
   importSettings: (settings: Partial<Settings>) => void;
   reset: () => void;
 }
@@ -21,17 +22,19 @@ export const useSettingsStore = create<SettingsState>()(
       setHistoryLimit: (historyLimit) => set({ historyLimit }),
       setPersonalWorkspaceName: (name) =>
         set({ personalWorkspaceName: name.trim() || DEFAULT_SETTINGS.personalWorkspaceName }),
+      setAccentColor: (accentColor) => set({ accentColor }),
       importSettings: (settings) => set((s) => ({ ...s, ...settings })),
       reset: () => set({ ...DEFAULT_SETTINGS }),
     }),
     {
       name: 'apitab:settings',
       storage: createJSONStorage(() => browserLocalStorage),
-      partialize: ({ theme, requestTimeoutMs, historyLimit, personalWorkspaceName }) => ({
+      partialize: ({ theme, requestTimeoutMs, historyLimit, personalWorkspaceName, accentColor }) => ({
         theme,
         requestTimeoutMs,
         historyLimit,
         personalWorkspaceName,
+        accentColor,
       }),
     },
   ),
