@@ -27,3 +27,12 @@ export interface Collection {
 
 /** Anything that holds folders + requests — a collection root or a folder. */
 export type Container = Collection | CollectionFolder;
+
+/** A soft-deleted collection the current user created — for the "Deleted collections" list in Settings → Account & Teams. */
+export interface TrashedCollection {
+  id: string;
+  name: string;
+  teamId: string;
+  teamName: string;
+  deletedAt: number;
+}

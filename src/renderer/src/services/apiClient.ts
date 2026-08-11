@@ -10,6 +10,7 @@ import type {
   Team,
   TeamMember,
   TeamVariable,
+  TrashedCollection,
 } from '@/types';
 
 export class ApiError extends Error {
@@ -220,6 +221,15 @@ export const apiClient = {
 
   unshareCollection: (teamId: string, collectionId: string) =>
     request<{ message: string }>('POST', `/teams/${teamId}/collections/${collectionId}/unshare`),
+
+  fetchTrashedCollections: () =>
+    request<{ collections: TrashedCollection[] }>('GET', '/collections/trashed'),
+
+  restoreCollection: (collectionId: string) =>
+    request<Collection>('POST', `/collections/${collectionId}/restore`),
+
+  forceDeleteCollection: (collectionId: string) =>
+    request<{ message: string }>('DELETE', `/collections/${collectionId}/force`),
 
   // Usage analytics — deliberately best-effort; callers swallow errors so a
   // flaky network never affects the app itself. `auth: true` (the request()
