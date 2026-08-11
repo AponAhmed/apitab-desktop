@@ -15,6 +15,12 @@ files:
   - '!{README.md,CHANGELOG.md}'
 asarUnpack:
   - resources/**
+# Linux-only (see the script's own comment) — swaps the real Electron binary
+# for a tiny wrapper that sets ELECTRON_DISABLE_SANDBOX before exec'ing it,
+# since none of our four Linux targets ever fix the bundled chrome-sandbox
+# helper's permissions and Electron aborts before any window opens without
+# this (GitHub issue #10).
+afterPack: scripts/afterPackLinuxSandbox.cjs
 # Lets electron-updater (main/autoUpdate.ts) know where to check for new
 # releases. Public repo, so no token is needed at update-check time; CI still
 # publishes releases itself via softprops/action-gh-release (see build.yml).
