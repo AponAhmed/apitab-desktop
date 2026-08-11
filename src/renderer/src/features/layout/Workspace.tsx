@@ -16,6 +16,7 @@ import { ResponsePanel } from '@/features/requests/ResponsePanel';
 import { RecentRequestsBar } from './RecentRequestsBar';
 import { AppDialogs } from '@/components/AppDialogs';
 import { Toaster } from '@/components/Toaster';
+import { StressTestPanel } from '@/features/stressTest/StressTestPanel';
 
 export function Workspace() {
   useApplyTheme();
@@ -84,6 +85,7 @@ export function Workspace() {
 
       <Toaster />
       <AppDialogs />
+      <StressTestPanel />
     </div>
   );
 }
