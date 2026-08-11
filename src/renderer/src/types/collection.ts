@@ -23,6 +23,8 @@ export interface Collection {
   teamId?: string;
   /** The user id of whoever created this collection (from the team backend). Absent for local-only or pre-existing synced collections. */
   createdBy?: string;
+  /** Set only on entries in collectionStore's local `deletedCollections` trash — when this collection was deleted. */
+  deletedAt?: number;
 }
 
 /** Anything that holds folders + requests — a collection root or a folder. */

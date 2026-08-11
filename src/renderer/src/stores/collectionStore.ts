@@ -25,10 +25,20 @@ import type { ApiRequest, Collection } from '@/types';
 
 interface CollectionState {
   collections: Collection[];
+  /**
+   * Local-only (never-synced) root collections the user deleted, kept
+   * around for restore/permanent-delete — the local-device mirror of what
+   * the server already does for team collections (a soft delete there
+   * surfaces in the "Deleted collections" list via /collections/trashed).
+   * A deleted *folder* still hard-deletes; only whole collections land here.
+   */
+  deletedCollections: Collection[];
   createCollection: (name: string) => Collection;
   createFolder: (parentContainerId: string, name: string) => void;
   renameContainer: (containerId: string, name: string) => void;
   deleteContainer: (containerId: string) => void;
+  restoreCollection: (collectionId: string) => void;
+  permanentlyDeleteCollection: (collectionId: string) => void;
   duplicateContainer: (containerId: string) => void;
   /** Saves a copy of `request` into a container; returns the stored copy. */
   addRequest: (containerId: string, request: ApiRequest, name?: string) => ApiRequest | null;
@@ -90,6 +100,7 @@ export const useCollectionStore = create<CollectionState>()(
   persist(
     (set, get) => ({
       collections: [],
+      deletedCollections: [],
 
       createCollection: (name) => {
         const now = Date.now();
@@ -127,9 +138,44 @@ export const useCollectionStore = create<CollectionState>()(
 
       deleteContainer: (containerId) =>
         set((s) => {
+          const rootIndex = s.collections.findIndex((c) => c.id === containerId);
+          if (rootIndex !== -1) {
+            const target = s.collections[rootIndex];
+            if (!target.teamId) {
+              // Local-only root collection: trash it instead of hard-deleting,
+              // so it shows up in Settings for restore/permanent delete. A
+              // team collection's delete still hard-removes here — the
+              // syncService watcher turns that into a real server soft
+              // delete, which is what /collections/trashed already surfaces.
+              const nextCollections = [...s.collections];
+              nextCollections.splice(rootIndex, 1);
+              return {
+                collections: nextCollections,
+                deletedCollections: [...s.deletedCollections, { ...target, deletedAt: Date.now() }],
+              };
+            }
+          }
           const next = structuredClone(s.collections);
           return removeContainer(next, containerId) ? { collections: next } : s;
         }),
+
+      restoreCollection: (collectionId) =>
+        set((s) => {
+          const idx = s.deletedCollections.findIndex((c) => c.id === collectionId);
+          if (idx === -1) return s;
+          const { deletedAt: _deletedAt, ...restored } = s.deletedCollections[idx];
+          const nextDeleted = [...s.deletedCollections];
+          nextDeleted.splice(idx, 1);
+          return {
+            collections: [...s.collections, restored as Collection],
+            deletedCollections: nextDeleted,
+          };
+        }),
+
+      permanentlyDeleteCollection: (collectionId) =>
+        set((s) => ({
+          deletedCollections: s.deletedCollections.filter((c) => c.id !== collectionId),
+        })),
 
       duplicateContainer: (containerId) =>
         set((s) => {
@@ -321,11 +367,15 @@ export const useCollectionStore = create<CollectionState>()(
     {
       name: 'apitab:collections',
       storage: createJSONStorage(() => browserLocalStorage),
-      partialize: ({ collections }) => ({ collections }),
+      partialize: ({ collections, deletedCollections }) => ({ collections, deletedCollections }),
       // Backfill folders/requests on data saved before nesting existed.
       merge: (persisted, current) => {
-        const p = (persisted ?? {}) as { collections?: Collection[] };
-        return { ...current, collections: (p.collections ?? []).map(normalizeContainer) };
+        const p = (persisted ?? {}) as { collections?: Collection[]; deletedCollections?: Collection[] };
+        return {
+          ...current,
+          collections: (p.collections ?? []).map(normalizeContainer),
+          deletedCollections: (p.deletedCollections ?? []).map(normalizeContainer),
+        };
       },
     },
   ),

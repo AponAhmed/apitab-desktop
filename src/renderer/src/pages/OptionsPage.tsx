@@ -139,10 +139,23 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
   const resetTeams = useTeamStore((s) => s.reset);
   const openLogin = useDialogStore((s) => s.openLogin);
 
+  /**
+   * Two independent trash sources merged into one list: collections that
+   * were shared with a team soft-delete server-side (fetched below), while
+   * collections that never left this device get trashed locally in
+   * collectionStore — see deleteContainer() there. `source` picks which
+   * backing action a row's Restore/Delete buttons call.
+   */
+  type DeletedRow = { source: 'local' | 'server'; id: string; name: string; teamName: string; deletedAt: number };
+
+  const localDeletedCollections = useCollectionStore((s) => s.deletedCollections);
+  const restoreLocalCollection = useCollectionStore((s) => s.restoreCollection);
+  const permanentlyDeleteLocalCollection = useCollectionStore((s) => s.permanentlyDeleteCollection);
+
   const [trashedCollections, setTrashedCollections] = useState<TrashedCollection[]>([]);
   const [trashedLoading, setTrashedLoading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
-  const [forceDeleteTarget, setForceDeleteTarget] = useState<TrashedCollection | null>(null);
+  const [forceDeleteTarget, setForceDeleteTarget] = useState<DeletedRow | null>(null);
 
   const loadTrashedCollections = async () => {
     setTrashedLoading(true);
@@ -161,12 +174,34 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, session]);
 
-  const restoreTrashedCollection = async (item: TrashedCollection) => {
-    setRestoringId(item.id);
+  const deletedRows: DeletedRow[] = [
+    ...localDeletedCollections.map((c) => ({
+      source: 'local' as const,
+      id: c.id,
+      name: c.name,
+      teamName: 'Local workspace',
+      deletedAt: c.deletedAt ?? 0,
+    })),
+    ...trashedCollections.map((c) => ({
+      source: 'server' as const,
+      id: c.id,
+      name: c.name,
+      teamName: c.teamName,
+      deletedAt: c.deletedAt,
+    })),
+  ].sort((a, b) => b.deletedAt - a.deletedAt);
+
+  const restoreDeletedRow = async (row: DeletedRow) => {
+    if (row.source === 'local') {
+      restoreLocalCollection(row.id);
+      toast.success(`"${row.name}" restored`);
+      return;
+    }
+    setRestoringId(row.id);
     try {
-      await apiClient.restoreCollection(item.id);
-      toast.success(`"${item.name}" restored`);
-      setTrashedCollections((prev) => prev.filter((c) => c.id !== item.id));
+      await apiClient.restoreCollection(row.id);
+      toast.success(`"${row.name}" restored`);
+      setTrashedCollections((prev) => prev.filter((c) => c.id !== row.id));
       // Reuses the normal poll pipeline instead of merging the restored
       // collection into local state by hand — restore() bumps the
       // collection's updated_at server-side, so the next sync tick picks
@@ -179,11 +214,16 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
     }
   };
 
-  const forceDeleteTrashedCollection = async (item: TrashedCollection) => {
+  const permanentlyDeleteRow = async (row: DeletedRow) => {
+    if (row.source === 'local') {
+      permanentlyDeleteLocalCollection(row.id);
+      toast.success(`"${row.name}" permanently deleted`);
+      return;
+    }
     try {
-      await apiClient.forceDeleteCollection(item.id);
-      toast.success(`"${item.name}" permanently deleted`);
-      setTrashedCollections((prev) => prev.filter((c) => c.id !== item.id));
+      await apiClient.forceDeleteCollection(row.id);
+      toast.success(`"${row.name}" permanently deleted`);
+      setTrashedCollections((prev) => prev.filter((c) => c.id !== row.id));
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to permanently delete collection');
     }
@@ -490,62 +530,65 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
                       <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">{syncError}</p>
                     )}
                   </div>
-
-                  <div>
-                    <div className="mb-1.5 flex items-center justify-between">
-                      <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Deleted collections
-                        {trashedCollections.length > 0 && ` (${trashedCollections.length})`}
-                      </span>
-                    </div>
-                    {trashedLoading ? (
-                      <p className="text-xs text-slate-400">Loading…</p>
-                    ) : trashedCollections.length === 0 ? (
-                      <p className="text-xs text-slate-400">
-                        Collections you've deleted or unshared show up here, so you can restore
-                        one if it was a mistake.
-                      </p>
-                    ) : (
-                      <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 text-sm dark:divide-slate-800 dark:border-slate-700">
-                        {trashedCollections.map((c) => (
-                          <li
-                            key={c.id}
-                            className="flex items-center justify-between gap-3 px-3.5 py-2.5"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate font-medium text-slate-700 dark:text-slate-200">
-                                {c.name}
-                              </p>
-                              <p className="truncate text-xs text-slate-400">
-                                {c.teamName} · Deleted {new Date(c.deletedAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => void restoreTrashedCollection(c)}
-                                disabled={restoringId === c.id}
-                              >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                                Restore
-                              </Button>
-                              <IconButton
-                                aria-label="Permanently delete"
-                                title="Permanently delete"
-                                onClick={() => setForceDeleteTarget(c)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                              </IconButton>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
                 </div>
               )}
+
+              {/* Local, never-synced deletions land here too — unlike the
+                  rest of this section, not gated behind `session`, since a
+                  local collection's trash has nothing to do with the account. */}
+              <div className={session ? 'mt-5' : 'mt-6'}>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Deleted collections
+                    {deletedRows.length > 0 && ` (${deletedRows.length})`}
+                  </span>
+                </div>
+                {trashedLoading ? (
+                  <p className="text-xs text-slate-400">Loading…</p>
+                ) : deletedRows.length === 0 ? (
+                  <p className="text-xs text-slate-400">
+                    Collections you've deleted or unshared show up here, so you can restore one
+                    if it was a mistake.
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 text-sm dark:divide-slate-800 dark:border-slate-700">
+                    {deletedRows.map((row) => (
+                      <li
+                        key={`${row.source}:${row.id}`}
+                        className="flex items-center justify-between gap-3 px-3.5 py-2.5"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-slate-700 dark:text-slate-200">
+                            {row.name}
+                          </p>
+                          <p className="truncate text-xs text-slate-400">
+                            {row.teamName} · Deleted {new Date(row.deletedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void restoreDeletedRow(row)}
+                            disabled={restoringId === row.id}
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                            Restore
+                          </Button>
+                          <IconButton
+                            aria-label="Permanently delete"
+                            title="Permanently delete"
+                            onClick={() => setForceDeleteTarget(row)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                          </IconButton>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </>
           )}
 
@@ -684,7 +727,7 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
         }
         confirmLabel="Delete permanently"
         onConfirm={() => {
-          if (forceDeleteTarget) void forceDeleteTrashedCollection(forceDeleteTarget);
+          if (forceDeleteTarget) void permanentlyDeleteRow(forceDeleteTarget);
         }}
         onClose={() => setForceDeleteTarget(null)}
       />
