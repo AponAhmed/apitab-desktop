@@ -17,6 +17,7 @@ import {
   User,
   UserMinus,
   Users,
+  Zap,
 } from 'lucide-react';
 import { useCollectionStore } from '@/stores/collectionStore';
 import { useRequestStore } from '@/stores/requestStore';
@@ -39,10 +40,13 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { AssignmentRow } from '@/components/PendingAssignmentsBell';
 import { ShareToTeamDialog } from './ShareToTeamDialog';
 import { RunnerPanel } from '@/features/runner/RunnerPanel';
+import { useStressTestStore } from '@/stores/stressTestStore';
+import { StressTestConfigModal } from '@/features/stressTest/StressTestConfigModal';
 import { cn } from '@/utils/cn';
 import { countRequests, flattenRequests, isCollection } from '@/utils/collectionTree';
 import { exportContainer, parseCollectionExport, sanitizeFilename } from '@/utils/collectionIO';
 import { parsePostmanFile } from '@/utils/postmanImport';
+import { parseOpenApiFile } from '@/utils/openApiImport';
 import { downloadJson, readFileAsText } from '@/services/backup';
 import { createRequest } from '@/utils/defaults';
 import type { ApiRequest, Collection, Container, TeamRole } from '@/types';
@@ -82,6 +86,7 @@ interface CollectionActions {
   importInto: (containerId: string) => void;
   duplicateRequest: (id: string) => void;
   deleteRequest: (req: ApiRequest) => void;
+  concurrentTest: (req: ApiRequest) => void;
   shareToTeam: (collectionId: string) => void;
   unshare: (container: Container) => void;
   moveFolder: (folderId: string, targetContainerId: string, referenceId?: string, position?: 'before' | 'after') => void;
@@ -117,6 +122,7 @@ const RequestNode = memo(function RequestNode({
   const [dropZone, setDropZone] = useState<'before' | 'after' | null>(null);
   const items: MenuItem[] = [
     { label: 'Duplicate', icon: Copy, onClick: () => actions.duplicateRequest(request.id) },
+    { label: 'Concurrent Test', icon: Zap, onClick: () => actions.concurrentTest(request) },
     { label: 'Delete', icon: Trash2, danger: true, onClick: () => actions.deleteRequest(request) },
   ];
 
@@ -437,6 +443,14 @@ function filterContainer<T extends Container>(container: T, q: string): T | null
   return null;
 }
 
+/** Condenses an OpenAPI import's non-fatal warnings into one toast-sized line. */
+function summarizeOpenApiWarnings(warnings: string[]): string {
+  const MAX_SHOWN = 3;
+  const shown = warnings.slice(0, MAX_SHOWN).join(' • ');
+  const more = warnings.length > MAX_SHOWN ? ` (+${warnings.length - MAX_SHOWN} more)` : '';
+  return `Imported with ${warnings.length} warning${warnings.length === 1 ? '' : 's'}: ${shown}${more}`;
+}
+
 export function CollectionsPanel() {
   const collections = useCollectionStore((s) => s.collections);
   const createCollection = useCollectionStore((s) => s.createCollection);
@@ -588,6 +602,7 @@ export function CollectionsPanel() {
       },
       duplicateRequest,
       deleteRequest: (req) => setDeleteTarget({ id: req.id, name: req.name, kind: 'request' }),
+      concurrentTest: (req) => useStressTestStore.getState().openConfig(req),
       shareToTeam: (collectionId) => openShareToTeam(collectionId),
       moveFolder,
       moveRequest,
@@ -665,7 +680,15 @@ export function CollectionsPanel() {
       return;
     }
 
-    toast.error(native.error ?? 'Invalid file — not an ApiTab or Postman export');
+    // Not Postman either — try it as an OpenAPI/Swagger document (JSON or YAML).
+    const openApi = parseOpenApiFile(raw);
+    if (openApi.ok && openApi.data) {
+      importCollectionExport(openApi.data);
+      if (openApi.warnings?.length) toast.error(summarizeOpenApiWarnings(openApi.warnings));
+      return;
+    }
+
+    toast.error(native.error ?? 'Invalid file — not an ApiTab, Postman, or OpenAPI export');
   };
 
   return (
@@ -795,7 +818,7 @@ export function CollectionsPanel() {
       <input
         ref={fileRef}
         type="file"
-        accept="application/json,.json"
+        accept="application/json,.json,.yaml,.yml,application/yaml,text/yaml,application/x-yaml"
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
@@ -887,6 +910,7 @@ export function CollectionsPanel() {
       />
       <ShareToTeamDialog />
       <RunnerPanel />
+      <StressTestConfigModal />
     </div>
   );
 }
