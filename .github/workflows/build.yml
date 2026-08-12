@@ -112,3 +112,23 @@ jobs:
         with:
           files: artifacts/**/*
           body_path: release-notes.md
+
+      # Enqueues a release-announcement email to every verified, subscribed
+      # user (apitab-server sends them a few minutes apart on a cron tick,
+      # not all at once — see that repo's SendPendingReleaseEmails). Never
+      # fails the run: the actual release above already succeeded by this
+      # point, and that's the part that matters if this one call flakes.
+      - name: Notify apitab-server of the new release
+        continue-on-error: true
+        env:
+          RELEASE_SECRET: ${{ secrets.RELEASE_WEBHOOK_SECRET }}
+        run: |
+          jq -n \
+            --arg version "$GITHUB_REF_NAME" \
+            --arg url "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}" \
+            --rawfile notes release-notes.md \
+            '{version: $version, url: $url, notes: $notes}' \
+          | curl -sf -X POST "https://apitab.duckdns.org/api/releases/notify" \
+              -H "X-Release-Secret: $RELEASE_SECRET" \
+              -H "Content-Type: application/json" \
+              --data-binary @-
