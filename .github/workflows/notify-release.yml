@@ -1,0 +1,50 @@
+name: Announce release by email
+
+# Manually triggered only — not every release warrants a mass email (see
+# build.yml's release job, which stopped calling this automatically). Run
+# from the Actions tab whenever a release is worth announcing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Tag to announce, e.g. v1.4.29 (must already be a published release)'
+        required: true
+        type: string
+      notes:
+        description: "Leave blank to use that release's own GitHub notes as-is"
+        required: false
+        type: string
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release notes
+        id: notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          NOTES_OVERRIDE: ${{ inputs.notes }}
+        run: |
+          if [ -n "$NOTES_OVERRIDE" ]; then
+            printf '%s' "$NOTES_OVERRIDE" > notes.md
+          else
+            gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" --json body --jq '.body' > notes.md
+          fi
+          cat notes.md
+
+      - name: Notify apitab-server
+        env:
+          RELEASE_SECRET: ${{ secrets.RELEASE_WEBHOOK_SECRET }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          jq -n \
+            --arg version "$VERSION" \
+            --arg url "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${VERSION}" \
+            --rawfile notes notes.md \
+            '{version: $version, url: $url, notes: $notes}' \
+          | curl -sf -X POST "https://apitab.duckdns.org/api/releases/notify" \
+              -H "X-Release-Secret: $RELEASE_SECRET" \
+              -H "Content-Type: application/json" \
+              --data-binary @-
