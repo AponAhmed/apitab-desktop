@@ -16,11 +16,11 @@ files:
 asarUnpack:
   - resources/**
 # Linux-only (see the script's own comment) — swaps the real Electron binary
-# for a tiny wrapper that sets ELECTRON_DISABLE_SANDBOX before exec'ing it,
-# since none of our four Linux targets ever fix the bundled chrome-sandbox
-# helper's permissions and Electron aborts before any window opens without
-# this (GitHub issue #10).
-afterPack: scripts/afterPackLinuxSandbox.cjs
+# for a tiny wrapper that sets ELECTRON_DISABLE_SANDBOX and forces
+# --ozone-platform=x11 before exec'ing it (chrome-sandbox permissions,
+# GitHub issue #10; and Electron's native-Wayland blank-window bug, hit on
+# Fedora/GNOME Wayland and known-common on Hyprland).
+afterPack: scripts/afterPackLinux.cjs
 # Lets electron-updater (main/autoUpdate.ts) know where to check for new
 # releases. Public repo, so no token is needed at update-check time; CI still
 # publishes releases itself via softprops/action-gh-release (see build.yml).
