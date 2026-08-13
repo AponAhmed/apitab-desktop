@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Info, Monitor, Moon, PanelLeft, Settings, Sun } from 'lucide-react';
+import { Info, Monitor, Moon, PanelLeft, Settings, Sun, Terminal } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useUiStore } from '@/stores/uiStore';
 import { useDialogStore } from '@/stores/dialogStore';
@@ -42,6 +42,8 @@ function ThemeToggle() {
 
 export function TopBar() {
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+  const consoleOpen = useUiStore((s) => s.consoleOpen);
+  const toggleConsole = useUiStore((s) => s.toggleConsole);
   const openSettings = useDialogStore((s) => s.openSettings);
   const [aboutOpen, setAboutOpen] = useState(false);
   const { toggleMaximize } = useWindowControls();
@@ -102,6 +104,17 @@ export function TopBar() {
             <SyncButton />
             <PendingAssignmentsBell />
             <UpdateAvailableBell />
+            <IconButton
+              size="sm"
+              title="Toggle Console (Ctrl+`)"
+              aria-label="Toggle Console"
+              onClick={toggleConsole}
+              className={
+                consoleOpen ? 'bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100' : undefined
+              }
+            >
+              <Terminal className="h-4 w-4" />
+            </IconButton>
             <ThemeToggle />
             <IconButton size="sm" title="About" aria-label="About ApiTab" onClick={() => setAboutOpen(true)}>
               <Info className="h-4 w-4" />

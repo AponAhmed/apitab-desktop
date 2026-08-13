@@ -11,6 +11,10 @@ interface UiState {
   sidebarWidth: number;
   /** Height of the bottom response panel, in pixels. */
   responseHeight: number;
+  /** Whether the Debug Console panel is open. */
+  consoleOpen: boolean;
+  /** Height of the bottom Debug Console panel, in pixels. */
+  consoleHeight: number;
   /** Collapsed/expanded state per collection or folder id, keyed for persistence across restarts. */
   collapsedContainers: Record<string, boolean>;
   toggleSidebar: () => void;
@@ -18,6 +22,8 @@ interface UiState {
   setSidebarTab: (tab: SidebarTab) => void;
   setSidebarWidth: (width: number) => void;
   setResponseHeight: (height: number) => void;
+  toggleConsole: () => void;
+  setConsoleHeight: (height: number) => void;
   toggleContainerCollapsed: (id: string) => void;
   /** Explicitly opens a folder/collection — unlike toggle, safe to call when it's already expanded. */
   expandContainer: (id: string) => void;
@@ -30,6 +36,8 @@ export const useUiStore = create<UiState>()(
       sidebarTab: 'collections',
       sidebarWidth: 288,
       responseHeight: 320,
+      consoleOpen: false,
+      consoleHeight: 260,
       collapsedContainers: {},
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
@@ -38,6 +46,9 @@ export const useUiStore = create<UiState>()(
         set({ sidebarWidth: Math.max(200, Math.min(560, sidebarWidth)) }),
       setResponseHeight: (responseHeight) =>
         set({ responseHeight: Math.max(120, Math.min(900, responseHeight)) }),
+      toggleConsole: () => set((s) => ({ consoleOpen: !s.consoleOpen })),
+      setConsoleHeight: (consoleHeight) =>
+        set({ consoleHeight: Math.max(120, Math.min(900, consoleHeight)) }),
       toggleContainerCollapsed: (id) =>
         set((s) => ({ collapsedContainers: { ...s.collapsedContainers, [id]: !s.collapsedContainers[id] } })),
       expandContainer: (id) =>

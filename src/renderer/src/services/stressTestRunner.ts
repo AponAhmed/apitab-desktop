@@ -1,5 +1,13 @@
-import { executeRequest } from './requestService';
-import type { ApiRequest, StressTestConfig, StressTestRequestResult } from '@/types';
+import { executeRequest, prepareRequest } from './requestService';
+import { buildConsoleEntry, useConsoleStore } from '@/stores/consoleStore';
+import type {
+  ApiRequest,
+  ApiError,
+  ApiResponse,
+  PreparedRequest,
+  StressTestConfig,
+  StressTestRequestResult,
+} from '@/types';
 import type { VariableMap } from '@/utils/variables';
 
 /**
@@ -63,11 +71,33 @@ export function runStressTest(
     }
   }
 
+  // Every fired request also gets a Debug Console entry, same as a regular
+  // requestStore.ts send() — a stress test firing dozens of requests
+  // concurrently is exactly the case where being able to inspect what each
+  // one actually sent/received matters most. No scriptRun to attach here
+  // (fireOne never runs pre/post-request scripts, per this file's own
+  // top-of-file comment), so it's always null.
+  function logToConsole(prepared: PreparedRequest, response: ApiResponse | null, error: ApiError | null) {
+    useConsoleStore.getState().addEntry(
+      buildConsoleEntry({
+        requestId: requestSnapshot.id,
+        requestName: requestSnapshot.name || requestSnapshot.url,
+        method: requestSnapshot.method,
+        prepared,
+        resolved: true,
+        response,
+        error,
+        scriptRun: null,
+      }),
+    );
+  }
+
   async function fireOne(n: number) {
     const startedAt = Date.now();
     try {
-      const { result } = await executeRequest(requestSnapshot, varsSnapshot, timeoutMs);
+      const { prepared, result } = await executeRequest(requestSnapshot, varsSnapshot, timeoutMs);
       if (result.ok) {
+        logToConsole(prepared, result.response, null);
         onResult({
           requestNumber: n,
           startedAt,
@@ -77,6 +107,7 @@ export function runStressTest(
           body: config.storeResponse ? result.response.body : undefined,
         });
       } else {
+        logToConsole(prepared, null, result.error);
         onResult({
           requestNumber: n,
           startedAt,
@@ -87,13 +118,20 @@ export function runStressTest(
         });
       }
     } catch (err) {
+      const caughtError: ApiError = { type: 'unknown', message: err instanceof Error ? err.message : String(err) };
+      try {
+        logToConsole(prepareRequest(requestSnapshot, varsSnapshot), null, caughtError);
+      } catch {
+        // prepareRequest itself failing is not worth losing the stress-test
+        // result over — the console entry is best-effort.
+      }
       onResult({
         requestNumber: n,
         startedAt,
         status: null,
         timeMs: Date.now() - startedAt,
         success: false,
-        error: { type: 'unknown', message: err instanceof Error ? err.message : String(err) },
+        error: caughtError,
       });
     } finally {
       inFlight--;

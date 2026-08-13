@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, FlaskConical, XCircle } from 'lucide-react
 import { useRequestStore } from '@/stores/requestStore';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { cn } from '@/utils/cn';
+import { LOG_COLOR } from '@/utils/consoleLog';
 import type { ConsoleLog, ScriptRunResult, TestResult } from '@/types';
 
 function collect(run: ScriptRunResult | null) {
@@ -13,13 +14,6 @@ function collect(run: ScriptRunResult | null) {
   const errors: string[] = [run?.pre?.error, run?.post?.error].filter(Boolean) as string[];
   return { tests, logs, errors };
 }
-
-const LOG_COLOR: Record<ConsoleLog['level'], string> = {
-  log: 'text-slate-500 dark:text-slate-400',
-  info: 'text-sky-600 dark:text-sky-400',
-  warn: 'text-amber-600 dark:text-amber-400',
-  error: 'text-red-600 dark:text-red-400',
-};
 
 export function TestResultsView() {
   const scriptRun = useRequestStore((s) => s.scriptRun);

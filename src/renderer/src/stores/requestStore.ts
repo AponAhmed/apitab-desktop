@@ -12,6 +12,7 @@ import { binaryFileKey, useFileStore } from './fileStore';
 import { useEnvironmentStore } from './environmentStore';
 import { useSettingsStore } from './settingsStore';
 import { useHistoryStore } from './historyStore';
+import { buildConsoleEntry, useConsoleStore } from './consoleStore';
 import { useCollectionStore } from './collectionStore';
 import type {
   ApiRequest,
@@ -443,6 +444,19 @@ export const useRequestStore = create<RequestState>()(
               },
               useSettingsStore.getState().historyLimit,
             );
+
+            useConsoleStore.getState().addEntry(
+              buildConsoleEntry({
+                requestId: request.id,
+                requestName: request.name || request.url,
+                method: request.method,
+                prepared,
+                resolved: true,
+                response: result.ok ? result.response : null,
+                error: result.ok ? null : result.error,
+                scriptRun: finalScriptRun,
+              }),
+            );
           } catch (err) {
             const caughtError: ApiError = { type: 'unknown', message: (err as Error).message };
             const caughtScriptRun = scriptRun.pre || scriptRun.post ? scriptRun : null;
@@ -462,6 +476,39 @@ export const useRequestStore = create<RequestState>()(
                 },
               },
             }));
+
+            // Best-effort console entry even on a caught failure — this is
+            // exactly the case a debug console exists for. prepareRequest is
+            // pure/synchronous, safe to call again purely for display, using
+            // whatever vars the pre-request script's envUpdates already
+            // applied (see the `let vars` above).
+            try {
+              useConsoleStore.getState().addEntry(
+                buildConsoleEntry({
+                  requestId: request.id,
+                  requestName: request.name || request.url,
+                  method: request.method,
+                  prepared: prepareRequest(request, vars),
+                  resolved: true,
+                  response: null,
+                  error: caughtError,
+                  scriptRun: caughtScriptRun,
+                }),
+              );
+            } catch {
+              useConsoleStore.getState().addEntry(
+                buildConsoleEntry({
+                  requestId: request.id,
+                  requestName: request.name || request.url,
+                  method: request.method,
+                  prepared: { method: request.method, url: request.url, headers: [], bodyType: 'none', body: null },
+                  resolved: false,
+                  response: null,
+                  error: caughtError,
+                  scriptRun: caughtScriptRun,
+                }),
+              );
+            }
           }
         },
 

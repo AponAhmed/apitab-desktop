@@ -5,6 +5,7 @@ export interface ShortcutHandlers {
   onSave?: () => void;
   onCopyCurl?: () => void;
   onNew?: () => void;
+  onToggleConsole?: () => void;
 }
 
 /**
@@ -13,6 +14,7 @@ export interface ShortcutHandlers {
  *  - Ctrl/Cmd + S → save
  *  - Ctrl/Cmd + Shift + K → copy cURL
  *  - Ctrl/Cmd + Alt + N → new request
+ *  - Ctrl/Cmd + ` → toggle Debug Console
  */
 export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {
   const ref = useRef(handlers);
@@ -36,6 +38,9 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers): void {
       } else if (key === 'n' && e.altKey) {
         e.preventDefault();
         ref.current.onNew?.();
+      } else if (key === '`') {
+        e.preventDefault();
+        ref.current.onToggleConsole?.();
       }
     };
 

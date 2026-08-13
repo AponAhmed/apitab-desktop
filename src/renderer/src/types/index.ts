@@ -13,3 +13,4 @@ export * from './teamVariable';
 export * from './collectionAssignment';
 export * from './sync';
 export * from './stressTest';
+export * from './console';

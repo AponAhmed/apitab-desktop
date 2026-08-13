@@ -14,6 +14,7 @@ import { UrlBar } from '@/features/requests/UrlBar';
 import { RequestEditor } from '@/features/requests/RequestEditor';
 import { ResponsePanel } from '@/features/requests/ResponsePanel';
 import { RecentRequestsBar } from './RecentRequestsBar';
+import { ConsolePanel } from '@/features/console/ConsolePanel';
 import { AppDialogs } from '@/components/AppDialogs';
 import { Toaster } from '@/components/Toaster';
 import { StressTestPanel } from '@/features/stressTest/StressTestPanel';
@@ -30,12 +31,22 @@ export function Workspace() {
   const setResponseHeight = useUiStore((s) => s.setResponseHeight);
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
   const setSidebarWidth = useUiStore((s) => s.setSidebarWidth);
+  const consoleOpen = useUiStore((s) => s.consoleOpen);
+  const consoleHeight = useUiStore((s) => s.consoleHeight);
+  const setConsoleHeight = useUiStore((s) => s.setConsoleHeight);
 
   const { save, copyCurl, send, newRequest } = useRequestActions();
-  useKeyboardShortcuts({ onSend: send, onSave: save, onCopyCurl: copyCurl, onNew: newRequest });
+  useKeyboardShortcuts({
+    onSend: send,
+    onSave: save,
+    onCopyCurl: copyCurl,
+    onNew: newRequest,
+    onToggleConsole: () => useUiStore.getState().toggleConsole(),
+  });
 
   const onResizeStart = usePanelResize(responseHeight, setResponseHeight);
   const onSidebarResizeStart = useHorizontalResize(sidebarWidth, setSidebarWidth);
+  const onConsoleResizeStart = usePanelResize(consoleHeight, setConsoleHeight);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-white text-slate-800 dark:bg-slate-950 dark:text-slate-200">
@@ -82,6 +93,24 @@ export function Workspace() {
           <RecentRequestsBar />
         </main>
       </div>
+
+      {consoleOpen && (
+        <>
+          <div
+            onPointerDown={onConsoleResizeStart}
+            className="group flex h-1.5 shrink-0 cursor-row-resize items-center justify-center border-y border-slate-200 bg-slate-100 hover:bg-brand-100 dark:border-slate-800 dark:bg-slate-800/60 dark:hover:bg-brand-950"
+            title="Drag to resize"
+          >
+            <div className="h-0.5 w-8 rounded-full bg-slate-300 group-hover:bg-brand-400 dark:bg-slate-600" />
+          </div>
+          <div
+            style={{ height: consoleHeight }}
+            className="min-h-0 shrink-0 border-t border-slate-200 dark:border-slate-800"
+          >
+            <ConsolePanel />
+          </div>
+        </>
+      )}
 
       <Toaster />
       <AppDialogs />

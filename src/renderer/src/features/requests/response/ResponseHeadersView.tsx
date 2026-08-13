@@ -2,9 +2,15 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { List } from 'lucide-react';
 import type { ResponseHeader } from '@/types';
 
-export function ResponseHeadersView({ headers }: { headers: ResponseHeader[] }) {
+export function ResponseHeadersView({
+  headers,
+  emptyTitle = 'No response headers',
+}: {
+  headers: ResponseHeader[];
+  emptyTitle?: string;
+}) {
   if (headers.length === 0) {
-    return <EmptyState icon={List} title="No response headers" />;
+    return <EmptyState icon={List} title={emptyTitle} />;
   }
   return (
     <div className="h-full overflow-auto rounded-lg border border-slate-200 dark:border-slate-800">
