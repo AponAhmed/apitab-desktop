@@ -104,7 +104,7 @@ export function Workspace() {
             <div className="h-0.5 w-8 rounded-full bg-slate-300 group-hover:bg-brand-400 dark:bg-slate-600" />
           </div>
           <div
-            style={{ height: consoleHeight }}
+            style={{ height: consoleHeight, maxHeight: 480 }}
             className="min-h-0 shrink-0 border-t border-slate-200 dark:border-slate-800"
           >
             <ConsolePanel />

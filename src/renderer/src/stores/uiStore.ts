@@ -47,13 +47,31 @@ export const useUiStore = create<UiState>()(
       setResponseHeight: (responseHeight) =>
         set({ responseHeight: Math.max(120, Math.min(900, responseHeight)) }),
       toggleConsole: () => set((s) => ({ consoleOpen: !s.consoleOpen })),
+      // Capped well below responseHeight's own max — the console is a
+      // supplementary panel, not meant to be able to fill (and clip past)
+      // the whole window, which is what was happening when it and an
+      // already-tall response panel both grew large at once.
       setConsoleHeight: (consoleHeight) =>
-        set({ consoleHeight: Math.max(120, Math.min(900, consoleHeight)) }),
+        set({ consoleHeight: Math.max(120, Math.min(480, consoleHeight)) }),
       toggleContainerCollapsed: (id) =>
         set((s) => ({ collapsedContainers: { ...s.collapsedContainers, [id]: !s.collapsedContainers[id] } })),
       expandContainer: (id) =>
         set((s) => (s.collapsedContainers[id] ? { collapsedContainers: { ...s.collapsedContainers, [id]: false } } : s)),
     }),
-    { name: 'apitab:ui', storage: createJSONStorage(() => browserLocalStorage) },
+    {
+      name: 'apitab:ui',
+      storage: createJSONStorage(() => browserLocalStorage),
+      // Re-clamps consoleHeight on load too — a value persisted before the
+      // 480px cap was introduced would otherwise stay oversized forever,
+      // since setConsoleHeight's own clamp only runs on the next resize.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<UiState>;
+        return {
+          ...current,
+          ...p,
+          consoleHeight: Math.max(120, Math.min(480, p.consoleHeight ?? current.consoleHeight)),
+        };
+      },
+    },
   ),
 );
