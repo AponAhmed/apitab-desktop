@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Check,
   ChevronDown,
   ChevronRight,
   Copy,
+  Download,
   Globe,
   Pencil,
   Plus,
   Share2,
   Trash2,
+  Upload,
   Users,
 } from 'lucide-react';
 import { useEnvironmentStore } from '@/stores/environmentStore';
@@ -20,6 +22,10 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { IconButton } from '@/components/ui/IconButton';
 import { PromptDialog } from '@/components/PromptDialog';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { downloadJson, readFileAsText } from '@/services/backup';
+import { exportEnvironment, exportToEnvironment, parseEnvironmentExport } from '@/utils/environmentIO';
+import { sanitizeFilename } from '@/utils/collectionIO';
+import { toast } from '@/stores/toastStore';
 import { cn } from '@/utils/cn';
 import type { Environment, TeamVariable } from '@/types';
 
@@ -132,19 +138,50 @@ export function EnvironmentsPanel() {
   const duplicateEnv = useEnvironmentStore((s) => s.duplicateEnvironment);
   const updateVariable = useEnvironmentStore((s) => s.updateVariable);
   const removeVariable = useEnvironmentStore((s) => s.removeVariable);
+  const mergeImported = useEnvironmentStore((s) => s.mergeImported);
 
   const [expanded, setExpanded] = useState<string | null>(activeId);
   const [createOpen, setCreateOpen] = useState(false);
   const [renameTarget, setRenameTarget] = useState<Environment | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Environment | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const onImportFile = async (file: File) => {
+    const raw = await readFileAsText(file);
+    const parsed = parseEnvironmentExport(raw);
+    if (!parsed.ok || !parsed.data) {
+      toast.error(parsed.error ?? 'Invalid file — not an ApiTab environment export');
+      return;
+    }
+    const env = exportToEnvironment(parsed.data);
+    mergeImported([env]);
+    setExpanded(env.id);
+    toast.success(`Imported "${env.name}" with ${env.variables.length} variables`);
+  };
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-2 py-1.5">
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Environments</span>
-        <IconButton size="sm" title="New environment" onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
-        </IconButton>
+        <div className="flex items-center gap-0.5">
+          <IconButton size="sm" title="Import environment" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="h-4 w-4" />
+          </IconButton>
+          <IconButton size="sm" title="New environment" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+          </IconButton>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void onImportFile(f);
+            e.target.value = '';
+          }}
+        />
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto px-1 pb-2">
@@ -193,6 +230,15 @@ export function EnvironmentsPanel() {
                     <IconButton size="sm" title="Duplicate" onClick={() => duplicateEnv(env.id)}>
                       <Copy className="h-3 w-3" />
                     </IconButton>
+                    <IconButton
+                      size="sm"
+                      title="Export"
+                      onClick={() =>
+                        downloadJson(`apitab-env-${sanitizeFilename(env.name)}.json`, exportEnvironment(env))
+                      }
+                    >
+                      <Download className="h-3 w-3" />
+                    </IconButton>
                     <IconButton size="sm" title="Delete" onClick={() => setDeleteTarget(env)}>
                       <Trash2 className="h-3 w-3" />
                     </IconButton>
@@ -209,6 +255,7 @@ export function EnvironmentsPanel() {
                       valuePlaceholder="Value"
                       enableVariables={false}
                       columnRatio={['0.75fr', '1.25fr']}
+                      showNotes
                       showShareToggle
                       sharedIds={sharedIds(env)}
                       onToggleShared={(id) => {

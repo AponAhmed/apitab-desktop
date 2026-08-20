@@ -10,6 +10,8 @@ export interface EnvVariable {
    * marks it shareable, since values often hold secrets (tokens, keys).
    */
   shared?: boolean;
+  /** Free-text note — not sent anywhere, purely documentation for the row. */
+  description?: string;
 }
 
 /**
