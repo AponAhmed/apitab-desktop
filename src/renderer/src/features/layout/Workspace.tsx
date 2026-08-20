@@ -68,7 +68,7 @@ export function Workspace() {
           </>
         )}
 
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="space-y-1.5 border-b border-slate-200 bg-white px-2.5 py-2 dark:border-slate-800 dark:bg-slate-900">
             <RequestToolbar />
             <UrlBar />
@@ -104,7 +104,15 @@ export function Workspace() {
             <div className="h-0.5 w-8 rounded-full bg-slate-300 group-hover:bg-brand-400 dark:bg-slate-600" />
           </div>
           <div
-            style={{ height: consoleHeight, maxHeight: 480 }}
+            // A flat 480px cap wasn't enough on a shorter window or with an
+            // already-tall response panel — their combined height could
+            // still exceed the actual viewport, with nothing to shrink
+            // (both are `shrink-0`), so the console's bottom ended up
+            // clipped by the outer container's overflow-hidden. Capping
+            // relative to the viewport (40vh) means the console structurally
+            // can never claim more than a minority of the window, leaving
+            // room for the working area above it regardless of window size.
+            style={{ height: consoleHeight, maxHeight: 'min(480px, 40vh)' }}
             className="min-h-0 shrink-0 border-t border-slate-200 dark:border-slate-800"
           >
             <ConsolePanel />

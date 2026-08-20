@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { cn } from '@/utils/cn';
 import { CodeBlock } from '@/components/CodeBlock';
+import { JsonTreeView } from '@/components/JsonTreeView';
 import { formatJson, looksLikeJson } from '@/utils/json';
 import { highlightJson } from '@/utils/highlight';
 import { ResponseTable } from './ResponseTable';
@@ -53,9 +54,24 @@ export function ResponseBody({ response }: { response: ApiResponse }) {
     return result.ok ? result.value : response.body;
   }, [response.body, isJson]);
 
+  // Strict parse for the collapsible tree view — separate from `pretty`
+  // above (formatJson tolerates `//` comments the body editor allows on the
+  // way out, but a *response* body is never something we wrote, so there's
+  // nothing to strip here). Undefined falls back to the flat highlighted
+  // view below, same as any other JSON.parse failure already did before
+  // the tree view existed.
+  const parsed = useMemo(() => {
+    if (!isJson) return undefined;
+    try {
+      return { ok: true as const, value: JSON.parse(response.body) as unknown };
+    } catch {
+      return { ok: false as const, value: undefined };
+    }
+  }, [response.body, isJson]);
+
   const html = useMemo(
-    () => (jsonView === 'pretty' && isJson ? highlightJson(pretty) : undefined),
-    [jsonView, isJson, pretty],
+    () => (jsonView === 'pretty' && isJson && !parsed?.ok ? highlightJson(pretty) : undefined),
+    [jsonView, isJson, pretty, parsed],
   );
 
   if (response.body === '') {
@@ -105,6 +121,8 @@ export function ResponseBody({ response }: { response: ApiResponse }) {
       )}
       {isJson && jsonView === 'table' ? (
         <ResponseTable json={response.body} />
+      ) : isJson && jsonView === 'pretty' && parsed?.ok ? (
+        <JsonTreeView value={parsed.value} className="flex-1" />
       ) : (
         <CodeBlock
           code={jsonView === 'pretty' ? pretty : response.body}
