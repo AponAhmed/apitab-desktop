@@ -4,6 +4,7 @@ import { stripJsonComments } from '@/utils/json';
 import { useFileStore, binaryFileKey } from '@/stores/fileStore';
 import { arrayBufferToBase64 } from '@/utils/binary';
 import { useEnvironmentStore } from '@/stores/environmentStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { sendExecuteRequest, type WireRequest } from './messaging';
 import type {
   ApiRequest,
@@ -197,6 +198,7 @@ export async function executeRequest(
     formData,
     binary,
     timeoutMs,
+    ignoreTlsErrors: useSettingsStore.getState().ignoreTlsErrors,
   };
   const result = await sendExecuteRequest(wire);
   return { prepared, result };

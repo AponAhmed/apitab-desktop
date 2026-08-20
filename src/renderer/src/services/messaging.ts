@@ -28,6 +28,8 @@ export interface WireRequest {
   /** Whole-body file for the 'binary' body type. */
   binary?: WireFile;
   timeoutMs: number;
+  /** Skips TLS certificate verification for this request — see Settings > Requests. */
+  ignoreTlsErrors?: boolean;
 }
 
 /** Sends an HTTP request to the main process (via the preload bridge) and awaits the result. */

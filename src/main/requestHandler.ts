@@ -12,6 +12,34 @@ import type { ApiError, PreparedRequest, RequestResult, ResponseHeader } from '@
 // this module's own calls.
 setGlobalDispatcher(new Agent({ keepAliveTimeout: 60_000, keepAliveMaxTimeout: 120_000 }));
 
+// A separate dispatcher, not the global one — TLS verification stays on for
+// every request by default, and only opts out per-request when the caller
+// explicitly asks (Settings > Requests > "Ignore SSL certificate errors").
+// Created lazily since most users never touch the setting.
+let insecureDispatcher: Agent | undefined;
+function getInsecureDispatcher(): Agent {
+  insecureDispatcher ??= new Agent({
+    keepAliveTimeout: 60_000,
+    keepAliveMaxTimeout: 120_000,
+    connect: { rejectUnauthorized: false },
+  });
+  return insecureDispatcher;
+}
+
+// Node surfaces a self-signed/untrusted-chain cert as this exact set of
+// system error codes — common for local dev (e.g. a Docker Compose HTTPS
+// service with a self-signed or mkcert-issued certificate the OS doesn't
+// trust). Recognized here purely to point the user at the fix instead of
+// leaving them to guess from a raw OpenSSL code.
+const TLS_ERROR_CODES = new Set([
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'CERT_HAS_EXPIRED',
+  'ERR_TLS_CERT_ALTNAME_INVALID',
+]);
+
 function classifyError(err: unknown): ApiError {
   if (err instanceof DOMException && err.name === 'AbortError') {
     return { type: 'timeout', message: 'Request timed out.' };
@@ -23,10 +51,14 @@ function classifyError(err: unknown): ApiError {
     // error; the generic fallback only fires when Node gives us nothing.
     const cause = (err as { cause?: { code?: string; message?: string } }).cause;
     const detail = cause?.code ?? cause?.message ?? (err.message !== 'fetch failed' ? err.message : undefined);
+    const hint =
+      cause?.code && TLS_ERROR_CODES.has(cause.code)
+        ? ' — for local development against a self-signed certificate, enable Settings > Requests > "Ignore SSL certificate errors".'
+        : '';
     return {
       type: 'network',
       message: detail
-        ? `Network error: ${detail}`
+        ? `Network error: ${detail}${hint}`
         : 'Network error — the host may be unreachable or the DNS lookup failed.',
     };
   }
@@ -95,7 +127,12 @@ export async function executeRequest(req: PreparedRequest): Promise<RequestResul
       body,
       signal: controller.signal,
       redirect: 'follow',
-    });
+      // `dispatcher` is undici's own fetch extension (not in the standard
+      // RequestInit type), hence the cast — only set at all when the
+      // request actually asked for it, so every other request still goes
+      // through the real global (verifying) dispatcher.
+      ...(req.ignoreTlsErrors ? { dispatcher: getInsecureDispatcher() } : {}),
+    } as RequestInit);
 
     const buffer = await res.arrayBuffer();
     const timeMs = performance.now() - start;

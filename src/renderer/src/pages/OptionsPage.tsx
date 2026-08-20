@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  AlertTriangle,
   Check,
   Database,
   Download,
@@ -24,6 +25,7 @@ import {
 import { useApplyTheme } from '@/hooks/useApplyTheme';
 import { useApplyAccentColor } from '@/hooks/useApplyAccentColor';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { Toggle } from '@/components/ui/Toggle';
 import { useCollectionStore } from '@/stores/collectionStore';
 import { useEnvironmentStore } from '@/stores/environmentStore';
 import { useHistoryStore } from '@/stores/historyStore';
@@ -130,6 +132,8 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
   const setRequestTimeout = useSettingsStore((s) => s.setRequestTimeout);
   const historyLimit = useSettingsStore((s) => s.historyLimit);
   const setHistoryLimit = useSettingsStore((s) => s.setHistoryLimit);
+  const ignoreTlsErrors = useSettingsStore((s) => s.ignoreTlsErrors);
+  const setIgnoreTlsErrors = useSettingsStore((s) => s.setIgnoreTlsErrors);
 
   const session = useAccountStore((s) => s.session);
   const clearSession = useAccountStore((s) => s.clearSession);
@@ -455,6 +459,25 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
                         onChange={(e) => setHistoryLimit(Math.max(1, Number(e.target.value) || 1))}
                       />
                     </label>
+                  </div>
+
+                  <div className="mt-4 flex items-start justify-between gap-3 rounded-lg border border-slate-200 px-3.5 py-3 dark:border-slate-700">
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-slate-700 dark:text-slate-200">
+                        Ignore SSL certificate errors
+                      </p>
+                      <p className="mt-0.5 flex items-start gap-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
+                        For local development against a self-signed certificate (e.g. a Docker
+                        Compose HTTPS service). Leave off for real APIs — this removes protection
+                        against an invalid or spoofed certificate.
+                      </p>
+                    </div>
+                    <Toggle
+                      checked={ignoreTlsErrors}
+                      onChange={setIgnoreTlsErrors}
+                      aria-label="Ignore SSL certificate errors"
+                    />
                   </div>
                 </div>
               </div>

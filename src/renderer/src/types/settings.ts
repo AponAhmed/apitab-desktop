@@ -13,6 +13,13 @@ export interface Settings {
    * from. `null` means "use the app's default amber brand color."
    */
   accentColor: string | null;
+  /**
+   * Skips TLS certificate verification for every request. Off by default —
+   * this exists for local development against self-signed certs (e.g. a
+   * Docker Compose HTTPS service), not for real/production APIs, since it
+   * removes protection against a genuinely invalid or spoofed certificate.
+   */
+  ignoreTlsErrors: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -21,4 +28,5 @@ export const DEFAULT_SETTINGS: Settings = {
   historyLimit: 100,
   personalWorkspaceName: 'My Workspace',
   accentColor: null,
+  ignoreTlsErrors: false,
 };

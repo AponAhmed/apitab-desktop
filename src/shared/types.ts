@@ -51,6 +51,8 @@ export interface PreparedRequest {
   /** Whole-body file for the 'binary' body type. */
   binary?: PreparedFile;
   timeoutMs: number;
+  /** Skips TLS certificate verification for this request — see Settings > Requests. */
+  ignoreTlsErrors?: boolean;
 }
 
 export interface ResponseHeader {

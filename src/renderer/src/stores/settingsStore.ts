@@ -9,6 +9,7 @@ interface SettingsState extends Settings {
   setHistoryLimit: (limit: number) => void;
   setPersonalWorkspaceName: (name: string) => void;
   setAccentColor: (hex: string | null) => void;
+  setIgnoreTlsErrors: (ignore: boolean) => void;
   importSettings: (settings: Partial<Settings>) => void;
   reset: () => void;
 }
@@ -23,18 +24,20 @@ export const useSettingsStore = create<SettingsState>()(
       setPersonalWorkspaceName: (name) =>
         set({ personalWorkspaceName: name.trim() || DEFAULT_SETTINGS.personalWorkspaceName }),
       setAccentColor: (accentColor) => set({ accentColor }),
+      setIgnoreTlsErrors: (ignoreTlsErrors) => set({ ignoreTlsErrors }),
       importSettings: (settings) => set((s) => ({ ...s, ...settings })),
       reset: () => set({ ...DEFAULT_SETTINGS }),
     }),
     {
       name: 'apitab:settings',
       storage: createJSONStorage(() => browserLocalStorage),
-      partialize: ({ theme, requestTimeoutMs, historyLimit, personalWorkspaceName, accentColor }) => ({
+      partialize: ({ theme, requestTimeoutMs, historyLimit, personalWorkspaceName, accentColor, ignoreTlsErrors }) => ({
         theme,
         requestTimeoutMs,
         historyLimit,
         personalWorkspaceName,
         accentColor,
+        ignoreTlsErrors,
       }),
     },
   ),
