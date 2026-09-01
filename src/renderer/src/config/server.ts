@@ -2,7 +2,7 @@
  * ApiTab team-sync backend base URL. Swap this for your deployed Laravel
  * server's URL before shipping a production build.
  */
-export const API_BASE_URL = 'https://apitab.duckdns.org/api';
+export const API_BASE_URL = 'https://apitab.bitflw.com/api';
 
 /**
  * Static app-level key sent as `X-Api-Key` on every request, gating the

@@ -12,7 +12,7 @@ Built with **Electron + electron-vite + React + TypeScript + Tailwind CSS + Zust
 
 ## Download
 
-Prebuilt installers for Windows, macOS, and Linux are published on the [Releases page](https://github.com/AponAhmed/apitab-desktop/releases), and linked from the [ApiTab landing page](https://apitab.duckdns.org).
+Prebuilt installers for Windows, macOS, and Linux are published on the [Releases page](https://github.com/AponAhmed/apitab-desktop/releases), and linked from the [ApiTab landing page](https://apitab.bitflw.com).
 
 Builds are currently **unsigned** (no code-signing certificate yet):
 
