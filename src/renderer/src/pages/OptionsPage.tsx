@@ -6,6 +6,7 @@ import {
   Download,
   ExternalLink,
   GitBranch,
+  Globe,
   Info,
   KeyRound,
   LogIn,
@@ -695,6 +696,19 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
                   </div>
 
                   <a
+                    href={ABOUT.website}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 text-sm text-brand-600 hover:underline dark:text-brand-400"
+                  >
+                    <Globe className="h-4 w-4 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {ABOUT.website.replace(/^https?:\/\//, '')}
+                    </span>
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                  </a>
+
+                  <a
                     href={ABOUT.repoUrl}
                     target="_blank"
                     rel="noreferrer"
@@ -705,6 +719,27 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
                       {ABOUT.repoUrl.replace(/^https?:\/\//, '')}
                     </span>
                     <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                  </a>
+                </div>
+
+                <div>
+                  <GroupLabel>Made by</GroupLabel>
+                  <a
+                    href={ABOUT.organization.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block rounded-lg border border-slate-200 px-3.5 py-3 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                  >
+                    <p className="flex items-center gap-1.5 text-sm font-medium text-slate-800 dark:text-slate-100">
+                      {ABOUT.organization.name}
+                      <ExternalLink className="h-3 w-3 shrink-0 text-slate-400" />
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                      {ABOUT.organization.blurb}
+                    </p>
+                    <p className="mt-1.5 text-xs text-brand-600 dark:text-brand-400">
+                      {ABOUT.organization.url.replace(/^https?:\/\//, '')}
+                    </p>
                   </a>
                 </div>
 

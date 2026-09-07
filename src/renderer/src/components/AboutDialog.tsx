@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ExternalLink, GitBranch, Mail, Users } from 'lucide-react';
+import { ExternalLink, GitBranch, Globe, Mail, Users } from 'lucide-react';
 import { Modal } from './ui/Modal';
 import { Logo } from './Logo';
 import { UpdateStatusPanel } from './UpdateStatusPanel';
@@ -119,6 +119,16 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
           </h3>
           <div className="space-y-1">
             <a
+              href={ABOUT.website}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <Globe className="h-4 w-4 shrink-0 text-slate-400" />
+              <span className="min-w-0 flex-1 truncate">{ABOUT.website.replace(/^https?:\/\//, '')}</span>
+              <ExternalLink className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+            </a>
+            <a
               href={ABOUT.repoUrl}
               target="_blank"
               rel="noreferrer"
@@ -141,6 +151,29 @@ export function AboutDialog({ open, onClose }: { open: boolean; onClose: () => v
               </a>
             ))}
           </div>
+        </section>
+
+        <section>
+          <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            Made by
+          </h3>
+          <a
+            href={ABOUT.organization.url}
+            target="_blank"
+            rel="noreferrer"
+            className="block rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+          >
+            <p className="flex items-center gap-1.5 text-sm font-medium text-slate-800 dark:text-slate-100">
+              {ABOUT.organization.name}
+              <ExternalLink className="h-3 w-3 shrink-0 text-slate-400" />
+            </p>
+            <p className="mt-0.5 text-xs leading-snug text-slate-500 dark:text-slate-400">
+              {ABOUT.organization.blurb}
+            </p>
+            <p className="mt-1 text-xs text-brand-600 dark:text-brand-400">
+              {ABOUT.organization.url.replace(/^https?:\/\//, '')}
+            </p>
+          </a>
         </section>
 
         <p className="text-center text-[11px] text-slate-400">
