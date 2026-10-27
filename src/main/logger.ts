@@ -14,8 +14,15 @@ export interface LogEntryInput {
 const RETAIN_DAYS = 3;
 const FILENAME_RE = /^\d{4}-\d{2}-\d{2}\.log$/;
 
+// The OS temp directory rather than userData: guaranteed writable by the
+// current user on Windows (%TEMP%), macOS ($TMPDIR, typically under
+// /var/folders) and Linux ($TMPDIR or /tmp) alike, by OS convention — no
+// admin rights, no macOS TCC prompt (unlike Desktop/Documents/Downloads,
+// temp dirs aren't permission-gated at all). A dedicated subfolder (not the
+// bare temp root) keeps every day's file together and avoids colliding with
+// anything else writing to the same shared directory.
 function logsDir(): string {
-  const dir = join(app.getPath('userData'), 'logs');
+  const dir = join(app.getPath('temp'), 'apitab-logs');
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -58,20 +65,24 @@ function formatLine(entry: LogEntryInput): string {
 
 /**
  * Appends one line (plus an indented stack trace, if given) to today's log
- * file, creating the `logs/` folder on first use. Deliberately synchronous
+ * file, creating the logs folder on first use. Deliberately synchronous
  * (`appendFileSync`) — this only ever fires on an actual error/warning, not
  * a hot path, so the simplicity of not juggling a promise outweighs the
  * (negligible, for a few-line append) blocking cost. Never throws: a logging
- * failure (full disk, permissions) must not cascade into whatever error
- * handler called this in the first place.
+ * failure must not cascade into whatever error handler called this in the
+ * first place. A write failure here should be rare — see logsDir()'s own
+ * comment for why the temp directory was chosen specifically to avoid
+ * permission issues — but if it ever happens, this fails into the main
+ * process's own stderr instead of total silence, so logging-can't-log isn't
+ * invisible to whoever's actually debugging it.
  */
 export function logEntry(entry: LogEntryInput): void {
   try {
     const dir = logsDir();
     appendFileSync(join(dir, todayFilename()), formatLine(entry), 'utf-8');
     pruneOldLogs(dir);
-  } catch {
-    // Swallow — see doc comment above.
+  } catch (err) {
+    console.error('[logger] failed to write log entry:', err);
   }
 }
 

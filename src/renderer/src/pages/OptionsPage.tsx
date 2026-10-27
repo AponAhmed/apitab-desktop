@@ -771,7 +771,14 @@ export function OptionsPage({ onClose }: { onClose?: () => void }) {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => void window.api.log.openFolder()}
+                      onClick={() => {
+                        // shell.openPath resolves with an error string on
+                        // failure rather than rejecting — surface it instead
+                        // of a silent no-op click.
+                        void window.api.log.openFolder().then((err) => {
+                          if (err) toast.error(`Couldn't open logs folder: ${err}`);
+                        });
+                      }}
                       className="shrink-0"
                     >
                       <FolderOpen className="h-3.5 w-3.5" />
