@@ -3,6 +3,7 @@ import { electronAPI } from '@electron-toolkit/preload';
 import type {
   AppApi,
   GoogleOAuthResult,
+  LogApi,
   OAuthApi,
   PreparedRequest,
   RequestResult,
@@ -39,6 +40,10 @@ const api = {
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
     getPlatform: () => ipcRenderer.invoke('app:getPlatform'),
   } satisfies AppApi,
+  log: {
+    error: (entry) => ipcRenderer.invoke('log:error', entry),
+    openFolder: () => ipcRenderer.invoke('log:openFolder'),
+  } satisfies LogApi,
   oauth: {
     googleLogin: (): Promise<GoogleOAuthResult> => ipcRenderer.invoke('oauth:google'),
   } satisfies OAuthApi,

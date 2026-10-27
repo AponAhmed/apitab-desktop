@@ -6,8 +6,22 @@ import { executeRequest } from './requestHandler';
 import { flushPendingWrites, storageClear, storageGet, storageRemove, storageSet } from './store';
 import { registerAutoUpdate } from './autoUpdate';
 import { runGoogleOAuthLoopback } from './googleOAuth';
+import { logEntry, openLogsFolder } from './logger';
 import type { PreparedRequest } from '@shared/types';
 import icon from '../../resources/icon.png?asset';
+
+// Catches anything that escapes every try/catch in the main process (a bug,
+// not a handled failure — those already have their own error paths) so it
+// lands in logs/ instead of silently vanishing into Electron's own stderr,
+// which nobody sees outside a dev console. Registered before app.whenReady()
+// so it covers startup failures too, not just steady-state ones.
+process.on('uncaughtException', (err) => {
+  logEntry({ source: 'main', level: 'error', message: err.message, stack: err.stack, context: 'uncaughtException' });
+});
+process.on('unhandledRejection', (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  logEntry({ source: 'main', level: 'error', message: err.message, stack: err.stack, context: 'unhandledRejection' });
+});
 
 // Node resolves "localhost" to its /etc/hosts order, which on macOS is
 // typically IPv6 (::1) first. If the target only listens on IPv4 — e.g. a
@@ -146,6 +160,18 @@ app.whenReady().then(() => {
   // Desktop equivalent of the extension's `browser.runtime.getManifest().version`.
   ipcMain.handle('app:getVersion', () => app.getVersion());
   ipcMain.handle('app:getPlatform', () => process.platform);
+
+  // Runtime error log, day-rotated (logger.ts). The renderer process (React
+  // error boundary, window.onerror/unhandledrejection — see
+  // renderer/src/utils/runtimeLogging.ts) reports through this; the main
+  // process writes its own uncaughtException/unhandledRejection above
+  // directly, no IPC needed for those.
+  ipcMain.handle(
+    'log:error',
+    (_event, entry: { level?: 'error' | 'warn'; message: string; stack?: string; context?: string }) =>
+      logEntry({ source: 'renderer', level: entry.level ?? 'error', message: entry.message, stack: entry.stack, context: entry.context }),
+  );
+  ipcMain.handle('log:openFolder', () => openLogsFolder());
 
   // Custom title-bar controls (the window is `frame: false` — see createWindow).
   // `BrowserWindow.fromWebContents` rather than a captured `mainWindow`

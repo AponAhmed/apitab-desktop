@@ -106,6 +106,20 @@ export interface AppApi {
 }
 
 /**
+ * Runtime error log, day-rotated and capped at 3 days on disk (main/logger.ts)
+ * — the desktop equivalent of the extension's `browser.storage.local`-backed
+ * logger (src/utils/logger.ts). The main process writes its own
+ * uncaughtException/unhandledRejection directly; `error()` here is for the
+ * renderer process to report through (its ErrorBoundary, window.onerror,
+ * unhandledrejection — see renderer/src/utils/runtimeLogging.ts).
+ */
+export interface LogApi {
+  error(entry: { level?: 'error' | 'warn'; message: string; stack?: string; context?: string }): Promise<void>;
+  /** Opens the OS file manager at the logs folder. */
+  openFolder(): Promise<string>;
+}
+
+/**
  * Result of the main process's native-app OAuth loopback flow
  * (main/googleOAuth.ts) — an unexchanged authorization code plus the two
  * values needed to exchange it. The renderer forwards this as-is to
