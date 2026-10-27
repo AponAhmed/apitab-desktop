@@ -14,6 +14,7 @@ import { useSettingsStore } from './settingsStore';
 import { useHistoryStore } from './historyStore';
 import { buildConsoleEntry, useConsoleStore } from './consoleStore';
 import { useCollectionStore } from './collectionStore';
+import { responseCacheKey, useResponseCacheStore, type CachedResponse } from './responseCacheStore';
 import type {
   ApiRequest,
   ApiResponse,
@@ -70,24 +71,6 @@ function syncPathVariables(url: string, existing: KeyValue[]): KeyValue[] {
   const names = pathVariableNamesFromUrl(url);
   const byName = new Map(existing.map(sanitizeKeyValue).map((kv) => [kv.key, kv]));
   return names.map((name) => byName.get(name) ?? emptyKeyValue({ key: name }));
-}
-
-/** Snapshot of a request's last outcome, cached so switching between saved
- * requests shows each one's own last response instead of a blank panel. */
-export interface CachedResponse {
-  response: ApiResponse | null;
-  error: ApiError | null;
-  scriptRun: ScriptRunResult | null;
-  sentAt: number | null;
-}
-
-/**
- * The stable identity to cache a response under: the saved-request id when
- * this request has been saved (so reopening it from a collection finds its
- * last response), otherwise the draft's own (transient) id.
- */
-function responseCacheKey(request: ApiRequest, savedRef: SavedRequestRef | null): string {
-  return savedRef?.requestId ?? request.id;
 }
 
 /** Backfills defaults + trailing rows so any request is safe to edit/render. */
@@ -153,8 +136,6 @@ interface RequestState {
   scriptRun: ScriptRunResult | null;
   activeRequestTab: RequestTab;
   activeResponseTab: ResponseTab;
-  /** Last response/error/scriptRun per request id — see {@link responseCacheKey}. */
-  responseCache: Record<string, CachedResponse>;
 
   // URL / method / name
   setMethod: (method: HttpMethod) => void;
@@ -232,7 +213,6 @@ export const useRequestStore = create<RequestState>()(
         scriptRun: null,
         activeRequestTab: 'params',
         activeResponseTab: 'body',
-        responseCache: {},
 
         setMethod: (method) => patch((r) => ({ ...r, method })),
 
@@ -419,16 +399,13 @@ export const useRequestStore = create<RequestState>()(
               isLoading: false,
               scriptRun: finalScriptRun,
               activeResponseTab: showTests ? 'tests' : result.ok ? 'body' : s.activeResponseTab,
-              responseCache: {
-                ...s.responseCache,
-                [responseCacheKey(request, s.savedRef)]: {
-                  response: result.ok ? result.response : null,
-                  error: result.ok ? null : result.error,
-                  scriptRun: finalScriptRun,
-                  sentAt: Date.now(),
-                },
-              },
             }));
+            useResponseCacheStore.getState().setCached(responseCacheKey(request, get().savedRef), {
+              response: result.ok ? result.response : null,
+              error: result.ok ? null : result.error,
+              scriptRun: finalScriptRun,
+              sentAt: Date.now(),
+            });
 
             useHistoryStore.getState().addEntry(
               {
@@ -460,22 +437,19 @@ export const useRequestStore = create<RequestState>()(
           } catch (err) {
             const caughtError: ApiError = { type: 'unknown', message: (err as Error).message };
             const caughtScriptRun = scriptRun.pre || scriptRun.post ? scriptRun : null;
-            set((s) => ({
+            set({
               response: null,
               error: caughtError,
               isLoading: false,
               scriptRun: caughtScriptRun,
               sentAt: Date.now(),
-              responseCache: {
-                ...s.responseCache,
-                [responseCacheKey(request, s.savedRef)]: {
-                  response: null,
-                  error: caughtError,
-                  scriptRun: caughtScriptRun,
-                  sentAt: Date.now(),
-                },
-              },
-            }));
+            });
+            useResponseCacheStore.getState().setCached(responseCacheKey(request, get().savedRef), {
+              response: null,
+              error: caughtError,
+              scriptRun: caughtScriptRun,
+              sentAt: Date.now(),
+            });
 
             // Best-effort console entry even on a caught failure — this is
             // exactly the case a debug console exists for. prepareRequest is
@@ -525,8 +499,11 @@ export const useRequestStore = create<RequestState>()(
           }),
 
         loadRequest: (req, savedRef = null, snapshot) =>
-          set((s) => {
-            const cached = snapshot !== undefined ? snapshot : s.responseCache[responseCacheKey(req, savedRef)];
+          set(() => {
+            const cached =
+              snapshot !== undefined
+                ? snapshot
+                : useResponseCacheStore.getState().responseCache[responseCacheKey(req, savedRef)];
             return {
               request: normalizeForEditing(structuredClone(req)),
               savedRef,
@@ -550,20 +527,15 @@ export const useRequestStore = create<RequestState>()(
             .getState()
             .addRequest(containerId, get().request, name);
           if (saved) {
-            set((s) => {
-              // Carry the draft's cached response over to the new saved id,
-              // so it's still there next time this saved request is opened.
-              const oldKey = responseCacheKey(s.request, s.savedRef);
-              const cached = s.responseCache[oldKey];
-              return {
-                savedRef: { containerId, requestId: saved.id },
-                isDirty: false,
-                request: { ...s.request, name: saved.name },
-                responseCache: cached
-                  ? { ...s.responseCache, [saved.id]: cached }
-                  : s.responseCache,
-              };
-            });
+            // Carry the draft's cached response over to the new saved id, so
+            // it's still there next time this saved request is opened.
+            const oldKey = responseCacheKey(get().request, get().savedRef);
+            useResponseCacheStore.getState().copyCached(oldKey, saved.id);
+            set((s) => ({
+              savedRef: { containerId, requestId: saved.id },
+              isDirty: false,
+              request: { ...s.request, name: saved.name },
+            }));
           }
           return saved;
         },
@@ -585,7 +557,6 @@ export const useRequestStore = create<RequestState>()(
         savedRef: s.savedRef,
         activeRequestTab: s.activeRequestTab,
         activeResponseTab: s.activeResponseTab,
-        responseCache: s.responseCache,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<RequestState>;
@@ -593,7 +564,6 @@ export const useRequestStore = create<RequestState>()(
           ...current,
           ...p,
           request: p.request ? normalizeForEditing(p.request) : current.request,
-          responseCache: p.responseCache ?? {},
         };
       },
     },
