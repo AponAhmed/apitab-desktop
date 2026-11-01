@@ -1,0 +1,64 @@
+name: Notify users on an old version
+
+# Manually triggered only — not every release is worth re-nagging everyone
+# still behind (same reasoning as notify-release.yml being manual rather
+# than firing on every tag). Run from the Actions tab after a release worth
+# pushing stragglers toward.
+#
+# This only QUEUES reminders (apitab-server's /releases/notify-outdated).
+# Actual sending happens server-side, a few at a time on a cron tick, so a
+# large stale-user list can't make this workflow hang or fail.
+
+on:
+  workflow_dispatch:
+    inputs:
+      desktop_version:
+        description: 'Desktop version to nudge stale users toward, e.g. 1.4.37 (bare, no "v" — leave blank to skip desktop). Its changelog is pulled automatically from the matching release already announced via notify-release.yml.'
+        required: false
+        type: string
+      extension_version:
+        description: 'Extension version to nudge stale users toward, e.g. 0.11.23 (leave blank to skip the extension)'
+        required: false
+        type: string
+      extension_notes:
+        description: 'Optional changelog for the extension, as "- bullet" lines (the extension has no CI publishing its own changelog the way desktop does) — leave blank to send without one'
+        required: false
+        type: string
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require at least one version
+        if: ${{ inputs.desktop_version == '' && inputs.extension_version == '' }}
+        run: |
+          echo "::error::Provide desktop_version, extension_version, or both."
+          exit 1
+
+      - name: Queue outdated-version reminders
+        env:
+          RELEASE_SECRET: ${{ secrets.RELEASE_WEBHOOK_SECRET }}
+          DESKTOP_VERSION: ${{ inputs.desktop_version }}
+          EXTENSION_VERSION: ${{ inputs.extension_version }}
+          EXTENSION_NOTES: ${{ inputs.extension_notes }}
+        run: |
+          jq -n \
+            --arg desktopVersion "$DESKTOP_VERSION" \
+            --arg extensionVersion "$EXTENSION_VERSION" \
+            --arg extensionNotes "$EXTENSION_NOTES" \
+            '{
+              desktopVersion: ($desktopVersion | if . == "" then null else . end),
+              extensionVersion: ($extensionVersion | if . == "" then null else . end),
+              extensionNotes: ($extensionNotes | if . == "" then null else . end)
+            }' \
+          | curl -sf -X POST "https://apitab.bitflw.com/api/releases/notify-outdated" \
+              -H "X-Release-Secret: $RELEASE_SECRET" \
+              -H "Content-Type: application/json" \
+              --data-binary @- | tee response.json
+
+      - name: Summary
+        run: |
+          echo "### Outdated-version reminders queued" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat response.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
