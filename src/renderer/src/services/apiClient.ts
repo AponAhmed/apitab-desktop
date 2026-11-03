@@ -1,6 +1,7 @@
 import { API_BASE_URL, API_KEY } from '@/config/server';
 import { useAccountStore } from '@/stores/accountStore';
 import type {
+  AdminNotification,
   AuthSession,
   AuthUser,
   Collection,
@@ -201,6 +202,12 @@ export const apiClient = {
 
   declineAssignment: (assignmentId: string) =>
     request<{ message: string }>('POST', `/assignments/${assignmentId}/decline`),
+
+  fetchPendingNotifications: () =>
+    request<{ notifications: AdminNotification[] }>('GET', '/notifications/pending'),
+
+  dismissNotification: (notificationId: string) =>
+    request<{ message: string }>('POST', `/notifications/${notificationId}/dismiss`),
 
   fetchCollectionAssignments: (teamId: string, collectionId: string) =>
     request<{ assignments: CollectionAssigneeStatus[] }>(

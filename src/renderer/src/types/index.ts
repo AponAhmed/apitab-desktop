@@ -14,3 +14,4 @@ export * from './collectionAssignment';
 export * from './sync';
 export * from './stressTest';
 export * from './console';
+export * from './adminNotification';

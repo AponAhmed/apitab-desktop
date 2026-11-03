@@ -11,6 +11,7 @@ import { EnvironmentSelector } from '@/features/environments/EnvironmentSelector
 import { TeamSelector, SyncButton, AccountAvatar } from '@/features/account/AccountMenu';
 import { LoginDialog } from '@/features/account/LoginDialog';
 import { PendingAssignmentsBell } from '@/components/PendingAssignmentsBell';
+import { AdminNotificationBell } from '@/components/AdminNotificationBell';
 import { UpdateAvailableBell } from '@/components/UpdateAvailableBell';
 import { WindowControls } from '@/components/WindowControls';
 import { useWindowControls } from '@/hooks/useWindowControls';
@@ -103,6 +104,7 @@ export function TopBar() {
           <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 dark:border-slate-800 dark:bg-white/[0.04]">
             <SyncButton />
             <PendingAssignmentsBell />
+            <AdminNotificationBell />
             <UpdateAvailableBell />
             <IconButton
               size="sm"

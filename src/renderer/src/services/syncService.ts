@@ -5,6 +5,7 @@ import { useCollectionStore } from '@/stores/collectionStore';
 import { useEnvironmentStore } from '@/stores/environmentStore';
 import { useTeamVariablesStore } from '@/stores/teamVariablesStore';
 import { usePendingAssignmentsStore } from '@/stores/pendingAssignmentsStore';
+import { useAdminNotificationsStore } from '@/stores/adminNotificationsStore';
 import { useDialogStore } from '@/stores/dialogStore';
 import { toast } from '@/stores/toastStore';
 import type { Collection, Environment, TeamVariable } from '@/types';
@@ -469,6 +470,13 @@ async function runAllTeamsSyncInner(opts?: { skipRehydrate?: boolean; silent?: b
   try {
     const { assignments } = await apiClient.fetchPendingAssignments();
     usePendingAssignmentsStore.getState().setAll(assignments);
+  } catch {
+    // Offline/transient — keep showing the last known list.
+  }
+
+  try {
+    const { notifications } = await apiClient.fetchPendingNotifications();
+    useAdminNotificationsStore.getState().setAll(notifications);
   } catch {
     // Offline/transient — keep showing the last known list.
   }
