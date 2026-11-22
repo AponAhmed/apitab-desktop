@@ -433,10 +433,24 @@ async function runAllTeamsSyncInner(opts?: { skipRehydrate?: boolean; silent?: b
     // (separate, unawaited) persist hydration finishes, mergeSync runs
     // against an empty in-memory array, and the truncated result (just this
     // delta) gets persisted, silently overwriting the real on-disk data.
-    await useAccountStore.persist.rehydrate();
-    await useTeamStore.persist.rehydrate();
-    await useCollectionStore.persist.rehydrate();
-    await useTeamVariablesStore.persist.rehydrate();
+    //
+    // This rehydrate is itself a remote-origin write to collectionStore, so
+    // it must suppress onCollectionsChanged like every other one does
+    // (clearTeamCollectionsOnLogout, runSyncTick's mergeSync below). Without
+    // `applyingRemote` here, a share/create whose own persist-to-disk write
+    // is still in flight gets clobbered back to its pre-share on-disk
+    // snapshot by this read — which looks exactly like "the user deleted
+    // every team collection" to the owner/admin branch, and pushes a real
+    // server-side DELETE for something that was never actually removed.
+    applyingRemote = true;
+    try {
+      await useAccountStore.persist.rehydrate();
+      await useTeamStore.persist.rehydrate();
+      await useCollectionStore.persist.rehydrate();
+      await useTeamVariablesStore.persist.rehydrate();
+    } finally {
+      applyingRemote = false;
+    }
   }
 
   const session = useAccountStore.getState().session;
