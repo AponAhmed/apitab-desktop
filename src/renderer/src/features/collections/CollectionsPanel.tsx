@@ -433,12 +433,17 @@ function groupByWorkspace(
 }
 
 function filterContainer<T extends Container>(container: T, q: string): T | null {
-  if (container.name.toLowerCase().includes(q)) return container;
+  // `name`/`url` are typed as non-nullable `string`, but this is synced,
+  // local-first data that isn't actually validated against that type (e.g.
+  // an older import can leave a request with a null/empty url) — a crash
+  // here takes down the whole sidebar, not just that one row, so treat a
+  // bad value as "doesn't match" instead of trusting the type.
+  if ((container.name ?? '').toLowerCase().includes(q)) return container;
   const folders = container.folders
     .map((f) => filterContainer(f, q))
     .filter((f): f is NonNullable<typeof f> => f !== null);
   const requests = container.requests.filter(
-    (r) => r.name.toLowerCase().includes(q) || r.url.toLowerCase().includes(q),
+    (r) => (r.name ?? '').toLowerCase().includes(q) || (r.url ?? '').toLowerCase().includes(q),
   );
   if (folders.length || requests.length) return { ...container, folders, requests };
   return null;
